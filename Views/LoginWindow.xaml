@@ -1,0 +1,56 @@
+<Window x:Class="CustomPcStoreApp.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="АИС Кастом ПК - Вход в систему" 
+        Height="400" Width="500"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{StaticResource BackgroundGrayBrush}">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Заголовок -->
+        <Border Grid.Row="0" Background="{StaticResource PrimaryGrayBrush}" Padding="20">
+            <TextBlock Text="АИС Кастом ПК" Style="{StaticResource HeaderStyle}"/>
+        </Border>
+        
+        <!-- Основная область -->
+        <Grid Grid.Row="1" Margin="50">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Логотип-заглушка -->
+            <Rectangle Grid.Row="0" Height="80" Width="120" 
+                      Style="{StaticResource ImagePlaceholderStyle}"
+                      HorizontalAlignment="Center"/>
+            
+            <!-- Поле логина -->
+            <TextBlock Grid.Row="2" Text="Логин:" Style="{StaticResource BodyTextStyle}"/>
+            <TextBox Grid.Row="4" Name="LoginTextBox" Style="{StaticResource InputTextBoxStyle}"/>
+            
+            <!-- Поле пароля -->
+            <TextBlock Grid.Row="6" Text="Пароль:" Style="{StaticResource BodyTextStyle}"/>
+            <PasswordBox Grid.Row="8" Name="PasswordBox" Style="{StaticResource InputPasswordBoxStyle}"/>
+        </Grid>
+        
+        <!-- Кнопки -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="20">
+            <Button Content="Войти" Style="{StaticResource PrimaryButtonStyle}" Click="LoginButton_Click"/>
+            <Button Content="Отмена" Style="{StaticResource SecondaryButtonStyle}" Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
