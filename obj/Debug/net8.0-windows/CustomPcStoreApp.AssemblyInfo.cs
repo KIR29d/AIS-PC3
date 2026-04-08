@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CustomPcStoreApp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cecccbc106cc46f0f85410397c531af23c98768f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fdb28a9111274b97fd2cdfdc5c5c17c4fa77db21")]
 [assembly: System.Reflection.AssemblyProductAttribute("CustomPcStoreApp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("АИС Кастом ПК")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
