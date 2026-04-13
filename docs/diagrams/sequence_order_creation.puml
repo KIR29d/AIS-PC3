@@ -1,0 +1,131 @@
+@startuml
+' Диаграмма последовательности: Создание и обработка заказа
+' АИС для магазина кастомных ПК
+
+autonumber
+skinparam sequenceMessageAlign center
+
+actor "Менеджер" as Manager
+participant "Desktop UI" as UI
+control "OrderController" as OrderCtrl
+control "ClientController" as ClientCtrl
+entity "Заказы" as OrdersDB
+entity "Клиенты" as ClientsDB
+control "AssemblyController" as AssemblyCtrl
+entity "Сборочные_задания" as AssemblyDB
+entity "Аудит" as AuditDB
+
+== Поиск/Регистрация клиента ==
+
+Manager -> UI : Ввод данных клиента
+activate UI
+UI -> ClientCtrl : FindClient(phone/email)
+activate ClientCtrl
+ClientCtrl -> ClientsDB : SELECT по контактам
+activate ClientsDB
+ClientsDB --> ClientCtrl : Данные клиента / не найден
+deactivate ClientsDB
+
+alt Клиент найден
+    ClientCtrl --> UI : Данные клиента
+    UI --> Manager : Отобразить информацию
+else Клиент не найден
+    Manager -> UI : Регистрация нового клиента
+    UI -> ClientCtrl : CreateClient(data)
+    ClientCtrl -> ClientsDB : INSERT новый клиент
+    ClientsDB --> ClientCtrl : клиент_id
+    ClientCtrl -> AuditDB : LOG INSERT клиенты
+    ClientCtrl --> UI : Успешно зарегистрирован
+    UI --> Manager : Подтверждение
+end
+
+deactivate ClientCtrl
+deactivate UI
+
+== Оформление заказа ==
+
+Manager -> UI : Создать заказ
+activate UI
+UI -> OrderCtrl : CreateOrder(клиент_id)
+activate OrderCtrl
+OrderCtrl -> OrdersDB : INSERT заказ (статус='новый')
+activate OrdersDB
+OrdersDB --> OrderCtrl : заказ_id
+OrderCtrl -> AuditDB : LOG INSERT заказы
+OrderCtrl --> UI : Заказ создан
+UI --> Manager : Номер заказа
+
+== Добавление компонентов в заказ ==
+
+loop Для каждого компонента
+    Manager -> UI : Добавить компонент
+    UI -> OrderCtrl : AddComponent(заказ_id, компонент_id, кол-во)
+    activate OrderCtrl
+    OrderCtrl -> OrdersDB : Проверка наличия
+    OrdersDB --> OrderCtrl : Доступно/Недоступно
+    
+    alt Компонент доступен
+        OrderCtrl -> OrdersDB : Обновить сумму заказа
+        OrderCtrl -> AuditDB : LOG UPDATE заказы
+        OrderCtrl --> UI : Компонент добавлен
+        UI --> Manager : Подтверждение
+    else Компонент недоступен
+        OrderCtrl --> UI : Ошибка: нет на складе
+        UI --> Manager : Предупреждение
+    end
+    deactivate OrderCtrl
+end
+
+== Расчет итоговой суммы ==
+
+Manager -> UI : Рассчитать итог
+UI -> OrderCtrl : CalculateTotal(заказ_id)
+activate OrderCtrl
+OrderCtrl -> OrdersDB : SUM компонентов
+OrdersDB --> OrderCtrl : общая_сумма
+OrderCtrl -> OrdersDB : UPDATE общая_сумма
+OrderCtrl -> AuditDB : LOG UPDATE заказы
+OrderCtrl --> UI : Итоговая сумма
+UI --> Manager : Отобразить сумму
+deactivate OrderCtrl
+
+== Создание сборочного задания ==
+
+Manager -> UI : Передать в сборку
+activate UI
+UI -> OrderCtrl : UpdateStatus(заказ_id, 'в_работе')
+activate OrderCtrl
+OrderCtrl -> OrdersDB : UPDATE статус
+OrderCtrl -> AuditDB : LOG UPDATE заказы
+OrderCtrl --> UI : Статус изменён
+deactivate OrderCtrl
+
+UI -> AssemblyCtrl : CreateAssemblyTask(заказ_id)
+activate AssemblyCtrl
+AssemblyCtrl -> AssemblyDB : INSERT сборочное_задание
+activate AssemblyDB
+AssemblyDB --> AssemblyCtrl : сборка_id
+AssemblyCtrl -> AuditDB : LOG INSERT сборочные_задания
+AssemblyCtrl --> UI : Задание создано
+UI --> Manager : Номер сборочного задания
+deactivate AssemblyCtrl
+deactivate AssemblyDB
+
+deactivate UI
+deactivate OrdersDB
+
+== Назначение исполнителя ==
+
+Manager -> UI : Назначить сборщика
+activate UI
+UI -> AssemblyCtrl : AssignEmployee(сборка_id, сотрудник_id)
+activate AssemblyCtrl
+AssemblyCtrl -> AssemblyDB : UPDATE сотрудник_id
+AssemblyDB --> AssemblyCtrl : Успешно
+AssemblyCtrl -> AuditDB : LOG UPDATE сборочные_задания
+AssemblyCtrl --> UI : Исполнитель назначен
+UI --> Manager : Подтверждение
+deactivate AssemblyCtrl
+deactivate UI
+
+@enduml

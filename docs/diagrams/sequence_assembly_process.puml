@@ -1,0 +1,178 @@
+@startuml
+' Диаграмма последовательности: Процесс сборки ПК
+' АИС для магазина кастомных ПК
+
+autonumber
+skinparam sequenceMessageAlign center
+
+actor "Сборщик" as Builder
+participant "Desktop UI" as UI
+control "AssemblyController" as AssemblyCtrl
+entity "Сборочные_задания" as AssemblyDB
+entity "Компоненты" as ComponentsDB
+entity "Остатки_на_складе" as StockDB
+entity "Заказы" as OrdersDB
+entity "Аудит" as AuditDB
+control "StockController" as StockCtrl
+
+== Начало работы со сборочным заданием ==
+
+Builder -> UI : Войти в систему
+activate UI
+UI --> Builder : Авторизация успешна
+
+Builder -> UI : Получить мои задания
+UI -> AssemblyCtrl : GetMyTasks(сотрудник_id)
+activate AssemblyCtrl
+AssemblyCtrl -> AssemblyDB : SELECT WHERE сотрудник_id
+activate AssemblyDB
+AssemblyDB --> AssemblyCtrl : Список заданий
+AssemblyCtrl --> UI : Задания (статус='в_сборке')
+deactivate AssemblyDB
+deactivate AssemblyCtrl
+UI --> Builder : Отобразить список
+
+== Выбор задания и начало сборки ==
+
+Builder -> UI : Выбрать задание
+activate UI
+UI -> AssemblyCtrl : GetAssemblyDetails(сборка_id)
+activate AssemblyCtrl
+AssemblyCtrl -> AssemblyDB : SELECT сборочное_задание
+AssemblyDB --> AssemblyCtrl : Данные задания
+AssemblyCtrl -> AssemblyDB : SELECT компоненты_в_сборке
+AssemblyDB --> AssemblyCtrl : Список компонентов
+AssemblyCtrl --> UI : Детали задания
+UI --> Builder : Показать конфигурацию
+deactivate AssemblyCtrl
+
+alt Статус = 'ожидает'
+    Builder -> UI : Начать сборку
+    UI -> AssemblyCtrl : StartAssembly(сборка_id)
+    activate AssemblyCtrl
+    AssemblyCtrl -> AssemblyDB : UPDATE статус='в_сборке', дата_начала
+    activate AssemblyDB
+    AssemblyDB --> AssemblyCtrl : Успешно
+    AssemblyCtrl -> AuditDB : LOG UPDATE сборочные_задания
+    activate AuditDB
+    AuditDB --> AssemblyCtrl : Записано
+    deactivate AuditDB
+    AssemblyCtrl --> UI : Сборка начата
+    UI --> Builder : Подтверждение
+    deactivate AssemblyCtrl
+    deactivate AssemblyDB
+else Статус = 'в_сборке'
+    UI --> Builder : Сборка уже в процессе
+end
+
+== Сканирование компонентов ==
+
+loop Для каждого компонента
+    Builder -> UI : Сканировать компонент
+    activate UI
+    UI -> AssemblyCtrl : ScanComponent(сборка_id, штрихкод)
+    activate AssemblyCtrl
+    
+    AssemblyCtrl -> ComponentsDB : Найти по штрихкоду
+    activate ComponentsDB
+    ComponentsDB --> AssemblyCtrl : компонент_id
+    deactivate ComponentsDB
+    
+    AssemblyCtrl -> AssemblyDB : Проверить в списке required
+    activate AssemblyDB
+    AssemblyDB --> AssemblyCtrl : Требуется/Не требуется
+    deactivate AssemblyDB
+    
+    alt Компонент требуется
+        AssemblyCtrl -> AssemblyDB : Отметить как установленный
+        AssemblyDB --> AssemblyCtrl : Успешно
+        AssemblyCtrl -> AuditDB : LOG установка компонента
+        activate AuditDB
+        AuditDB --> AssemblyCtrl : Записано
+        deactivate AuditDB
+        AssemblyCtrl --> UI : Компонент подтверждён
+        UI --> Builder : ✓ Правильный компонент
+    else Компонент не требуется
+        AssemblyCtrl --> UI : Ошибка: не в спецификации
+        UI --> Builder : ✗ Неправильный компонент
+    end
+    
+    deactivate AssemblyCtrl
+    deactivate UI
+end
+
+== Резервирование компонентов на складе ==
+
+Builder -> UI : Завершить установку компонентов
+activate UI
+UI -> StockCtrl : ReserveComponents(сборка_id)
+activate StockCtrl
+
+loop Для каждого установленного компонента
+    StockCtrl -> StockDB : UPDATE количество -1
+    activate StockDB
+    StockDB --> StockCtrl : Успешно
+    StockCtrl -> AuditDB : LOG UPDATE остатки_на_складе
+    activate AuditDB
+    AuditDB --> StockCtrl : Записано
+    deactivate AuditDB
+    deactivate StockDB
+end
+
+StockCtrl --> UI : Компоненты зарезервированы
+UI --> Builder : Подтверждение списания
+deactivate StockCtrl
+deactivate UI
+
+== Завершение сборки ==
+
+Builder -> UI : Завершить сборку
+activate UI
+UI -> AssemblyCtrl : CompleteAssembly(сборка_id)
+activate AssemblyCtrl
+
+AssemblyCtrl -> AssemblyDB : UPDATE статус='готово', дата_завершения
+activate AssemblyDB
+AssemblyDB --> AssemblyCtrl : Успешно
+
+AssemblyCtrl -> AssemblyDB : GET заказ_id
+AssemblyDB --> AssemblyCtrl : заказ_id
+
+alt заказ_id существует
+    AssemblyCtrl -> OrdersDB : UPDATE статус='собран'
+    activate OrdersDB
+    OrdersDB --> AssemblyCtrl : Успешно
+    AssemblyCtrl -> AuditDB : LOG UPDATE заказы
+    activate AuditDB
+    AuditDB --> AssemblyCtrl : Записано
+    deactivate AuditDB
+    deactivate OrdersDB
+end
+
+AssemblyCtrl -> AuditDB : LOG UPDATE сборочные_задания
+activate AuditDB
+AuditDB --> AssemblyCtrl : Записано
+deactivate AuditDB
+
+AssemblyCtrl --> UI : Сборка завершена
+UI --> Builder : Подтверждение + статистика
+deactivate AssemblyCtrl
+deactivate AssemblyDB
+deactivate UI
+
+== Формирование отчета о сборке ==
+
+Builder -> UI : Просмотреть отчет
+activate UI
+UI -> AssemblyCtrl : GetAssemblyReport(сборка_id)
+activate AssemblyCtrl
+AssemblyCtrl -> AssemblyDB : SELECT время сборки
+AssemblyDB --> AssemblyCtrl : длительность
+AssemblyCtrl -> AssemblyDB : SELECT установленные компоненты
+AssemblyDB --> AssemblyCtrl : список
+AssemblyCtrl --> UI : Отчет о сборке
+UI --> Builder : Время, компоненты, статус
+deactivate AssemblyCtrl
+deactivate UI
+
+@enduml

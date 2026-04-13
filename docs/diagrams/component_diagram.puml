@@ -1,0 +1,257 @@
+@startuml
+' Диаграмма компонентов (Component Diagram)
+' АИС для магазина кастомных ПК
+
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+package "Desktop Application (WPF)" {
+  
+  [Presentaton Layer] as UI <<presentation>>
+  
+  package "Controllers" {
+    [AuthController] as AuthCtrl
+    [OrderController] as OrderCtrl
+    [ClientController] as ClientCtrl
+    [AssemblyController] as AssemblyCtrl
+    [StockController] as StockCtrl
+    [EmployeeController] as EmpCtrl
+    [ReportController] as ReportCtrl
+  }
+  
+  package "Views" {
+    [LoginWindow] as LoginView
+    [MainWindow] as MainView
+    [OrdersView] as OrdersView
+    [ClientsView] as ClientsView
+    [AssemblyView] as AssemblyView
+    [StockView] as StockView
+    [ReportsView] as ReportsView
+  }
+  
+  package "Models" {
+    [User] as UserModel
+    [Client] as ClientModel
+    [Order] as OrderModel
+    [AssemblyTask] as AssemblyModel
+    [Component] as ComponentModel
+    [Warehouse] as WarehouseModel
+  }
+}
+
+package "Business Logic Layer" {
+  
+  package "Services" {
+    [IAuthService] as AuthService <<interface>>
+    [IOrderService] as OrderService <<interface>>
+    [IClientService] as ClientService <<interface>>
+    [IAssemblyService] as AssemblyService <<interface>>
+    [IStockService] as StockService <<interface>>
+    [IEmployeeService] as EmpService <<interface>>
+    [IAuditService] as AuditService <<interface>>
+    [IReportService] as ReportService <<interface>>
+  }
+  
+  package "Service Implementations" {
+    [AuthServiceImpl] as AuthServiceImpl
+    [OrderServiceImpl] as OrderServiceImpl
+    [ClientServiceImpl] as ClientServiceImpl
+    [AssemblyServiceImpl] as AssemblyServiceImpl
+    [StockServiceImpl] as StockServiceImpl
+    [EmployeeServiceImpl] as EmpServiceImpl
+    [AuditServiceImpl] as AuditServiceImpl
+    [ReportServiceImpl] as ReportServiceImpl
+  }
+}
+
+package "Data Access Layer" {
+  
+  package "Repositories" {
+    [IUserRepository] as UserRepo <<interface>>
+    [IClientRepository] as ClientRepo <<interface>>
+    [IOrderRepository] as OrderRepo <<interface>>
+    [IAssemblyRepository] as AssemblyRepo <<interface>>
+    [IComponentRepository] as CompRepo <<interface>>
+    [IWarehouseRepository] as WarehouseRepo <<interface>>
+    [IDepartmentRepository] as DeptRepo <<interface>>
+    [IEmployeeRepository] as EmpRepo <<interface>>
+  }
+  
+  package "Repository Implementations" {
+    [UserRepositoryImpl] as UserRepoImpl
+    [ClientRepositoryImpl] as ClientRepoImpl
+    [OrderRepositoryImpl] as OrderRepoImpl
+    [AssemblyRepositoryImpl] as AssemblyRepoImpl
+    [ComponentRepositoryImpl] as CompRepoImpl
+    [WarehouseRepositoryImpl] as WarehouseRepoImpl
+    [DepartmentRepositoryImpl] as DeptRepoImpl
+    [EmployeeRepositoryImpl] as EmpRepoImpl
+  }
+  
+  [DbContext] as DbContext
+}
+
+package "Database (MS SQL Server)" {
+  
+  database "Tables" {
+    [роли] as DB_Roles
+    [пользователи] as DB_Users
+    [клиенты] as DB_Clients
+    [сотрудники] as DB_Employees
+    [отделы] as DB_Depts
+    [заказы] as DB_Orders
+    [сборочные_задания] as DB_Assembly
+    [компоненты] as DB_Components
+    [компоненты_в_сборке] as DB_AssemblyComp
+    [склады] as DB_Warehouses
+    [остатки_на_складе] as DB_Stock
+    [аудит_изменений] as DB_Audit
+  }
+}
+
+package "Web Application (Future)" {
+  
+  [Web Frontend] as WebUI <<Angular/React>>
+  
+  package "Web API" {
+    [AuthAPI] as WebAuth
+    [OrderAPI] as WebOrder
+    [ClientAPI] as WebClient
+    [PublicAPI] as WebPublic
+  }
+}
+
+' Отношения между компонентами
+
+' UI -> Controllers
+UI ..> AuthCtrl : использует
+UI ..> OrderCtrl : использует
+UI ..> ClientCtrl : использует
+UI ..> AssemblyCtrl : использует
+UI ..> StockCtrl : использует
+
+' Views -> Controllers
+LoginView --> AuthCtrl
+MainView --> OrderCtrl
+MainView --> ClientCtrl
+MainView --> AssemblyCtrl
+MainView --> StockCtrl
+OrdersView --> OrderCtrl
+ClientsView --> ClientCtrl
+AssemblyView --> AssemblyCtrl
+StockView --> StockCtrl
+
+' Controllers -> Models
+AuthCtrl --> UserModel
+OrderCtrl --> OrderModel
+ClientCtrl --> ClientModel
+AssemblyCtrl --> AssemblyModel
+StockCtrl --> ComponentModel
+StockCtrl --> WarehouseModel
+
+' Controllers -> Services
+AuthCtrl ..> AuthService : вызывает
+OrderCtrl ..> OrderService : вызывает
+ClientCtrl ..> ClientService : вызывает
+AssemblyCtrl ..> AssemblyService : вызывает
+StockCtrl ..> StockService : вызывает
+EmpCtrl ..> EmployeeService : вызывает
+ReportCtrl ..> ReportService : вызывает
+
+' Services -> Service Implementations
+AuthService <|-- AuthServiceImpl
+OrderService <|-- OrderServiceImpl
+ClientService <|-- ClientServiceImpl
+AssemblyService <|-- AssemblyServiceImpl
+StockService <|-- StockServiceImpl
+EmployeeService <|-- EmpServiceImpl
+AuditService <|-- AuditServiceImpl
+ReportService <|-- ReportServiceImpl
+
+' Service Implementations -> Repositories
+AuthServiceImpl ..> UserRepo : использует
+OrderServiceImpl ..> OrderRepo : использует
+OrderServiceImpl ..> ClientRepo : использует
+ClientServiceImpl ..> ClientRepo : использует
+AssemblyServiceImpl ..> AssemblyRepo : использует
+AssemblyServiceImpl ..> OrderRepo : использует
+StockServiceImpl ..> CompRepo : использует
+StockServiceImpl ..> WarehouseRepo : использует
+EmpServiceImpl ..> EmpRepo : использует
+EmpServiceImpl ..> DeptRepo : использует
+AuditServiceImpl ..> UserRepo : использует
+ReportServiceImpl ..> OrderRepo : использует
+ReportServiceImpl ..> AssemblyRepo : использует
+
+' Repositories -> Repository Implementations
+UserRepo <|-- UserRepoImpl
+ClientRepo <|-- ClientRepoImpl
+OrderRepo <|-- OrderRepoImpl
+AssemblyRepo <|-- AssemblyRepoImpl
+CompRepo <|-- CompRepoImpl
+WarehouseRepo <|-- WarehouseRepoImpl
+DeptRepo <|-- DeptRepoImpl
+EmpRepo <|-- EmpRepoImpl
+
+' Repository Implementations -> DbContext
+UserRepoImpl --> DbContext
+ClientRepoImpl --> DbContext
+OrderRepoImpl --> DbContext
+AssemblyRepoImpl --> DbContext
+CompRepoImpl --> DbContext
+WarehouseRepoImpl --> DbContext
+DeptRepoImpl --> DbContext
+EmpRepoImpl --> DbContext
+
+' DbContext -> Database
+DbContext ..> DB_Roles : маппинг
+DbContext ..> DB_Users : маппинг
+DbContext ..> DB_Clients : маппинг
+DbContext ..> DB_Employees : маппинг
+DbContext ..> DB_Depts : маппинг
+DbContext ..> DB_Orders : маппинг
+DbContext ..> DB_Assembly : маппинг
+DbContext ..> DB_Components : маппинг
+DbContext ..> DB_AssemblyComp : маппинг
+DbContext ..> DB_Warehouses : маппинг
+DbContext ..> DB_Stock : маппинг
+DbContext ..> DB_Audit : маппинг
+
+' Web Application connections
+WebUI ..> WebAuth : REST API
+WebUI ..> WebOrder : REST API
+WebUI ..> WebClient : REST API
+WebUI ..> WebPublic : REST API
+
+WebAuth ..> AuthService : использует
+WebOrder ..> OrderService : использует
+WebClient ..> ClientService : использует
+WebPublic ..> OrderService : использует
+
+note top of UI
+  WPF приложение для сотрудников
+  - Менеджеры
+  - Сборщики
+  - Администраторы
+end note
+
+note right of Services
+  Бизнес-логика системы
+  - Валидация данных
+  - Расчеты
+  - Правила предметной области
+end note
+
+note bottom of DbContext
+  Entity Framework Core
+  ORM для работы с БД
+end note
+
+note left of WebUI
+  Перспектива развития
+  - Личный кабинет клиента
+  - Конфигуратор ПК
+  - Отслеживание заказа
+end note
+
+@enduml
