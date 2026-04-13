@@ -1,0 +1,107 @@
+@startuml Sequence_Authentication
+title Последовательность: Аутентификация и авторизация
+
+skinparam sequenceMessageAlign center
+skinparam lifelineStrategy solid
+skinparam maxmessagesize 120
+autonumber
+
+' Объявляем ВСЕХ участников в начале, чтобы избежать дублирования линий жизни
+actor "Пользователь" as User
+participant "UI" as UI
+control "AuthController" as AuthCtrl
+entity "БД Пользователи" as UsersDB
+entity "БД Роли" as RolesDB
+entity "БД Аудит" as AuditDB
+
+== Этап 1: Вход в систему ==
+User -> UI : Ввод логина/пароля
+activate UI
+UI -> AuthCtrl : Login(login, password)
+activate AuthCtrl
+
+AuthCtrl -> UsersDB : SELECT по логину
+activate UsersDB
+UsersDB --> AuthCtrl : Данные (хэш, роль_id, активен)
+deactivate UsersDB
+
+alt Пользователь не найден
+    AuthCtrl --> UI : Ошибка: не найден
+    UI --> User : Сообщение об ошибке
+else Пользователь найден
+    AuthCtrl -> AuthCtrl : VerifyPassword(password, hash)
+    
+    alt Неверный пароль
+        AuthCtrl --> UI : Ошибка: неверный пароль
+        UI --> User : Сообщение об ошибке
+    else Пароль верный
+        AuthCtrl -> UsersDB : Проверка активен=1
+        
+        alt Пользователь заблокирован
+            AuthCtrl --> UI : Ошибка: заблокирован
+            UI --> User : Обратитесь к администратору
+        else Пользователь активен
+            AuthCtrl -> RolesDB : SELECT роль по роль_id
+            activate RolesDB
+            RolesDB --> AuthCtrl : название_роли
+            deactivate RolesDB
+            
+            AuthCtrl -> UsersDB : UPDATE дата_последнего_входа
+            UsersDB --> AuthCtrl : Успешно
+            
+            AuthCtrl -> AuditDB : LOG INSERT (LOGIN)
+            activate AuditDB
+            AuditDB --> AuthCtrl : Записано
+            deactivate AuditDB
+            
+            AuthCtrl --> UI : Успешный вход + токен + роль
+        end
+    end
+end
+
+deactivate AuthCtrl
+deactivate UI
+
+newpage
+
+== Этап 2: Инициализация интерфейса ==
+UI -> UI : Определить роль
+activate UI
+
+alt Роль = 'Администратор'
+    UI --> User : Показать все меню
+else Роль = 'Менеджер'
+    UI --> User : Доступ к заказам/клиентам
+else Роль = 'Сборщик'
+    UI --> User : Доступ к сборке
+end
+
+deactivate UI
+
+newpage
+
+== Этап 3: Проверка прав доступа ==
+User -> UI : Открыть окно заказов
+activate UI
+UI -> AuthCtrl : CheckPermission('orders.view')
+activate AuthCtrl
+
+AuthCtrl -> UsersDB : GET роль_id
+activate UsersDB
+UsersDB --> AuthCtrl : роль_id
+AuthCtrl -> RolesDB : GET права для роли
+activate RolesDB
+RolesDB --> AuthCtrl : список прав
+AuthCtrl --> UI : Разрешено / Запрещено
+deactivate RolesDB
+deactivate UsersDB
+deactivate AuthCtrl
+
+alt Доступ разрешен
+    UI --> User : Отобразить заказы
+else Доступ запрещен
+    UI --> User : Нет прав доступа
+end
+
+deactivate UI
+@enduml

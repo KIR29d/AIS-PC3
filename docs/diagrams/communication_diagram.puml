@@ -1,0 +1,152 @@
+@startuml Communication_Diagram
+' Диаграмма коммуникации (Communication Diagram)
+' АИС для магазина кастомных ПК
+' Взаимодействие при создании заказа клиентом и обработке менеджером
+
+skinparam sequenceMessageAlign center
+skinparam maxmessagesize 120
+
+' Объекты системы
+object "Клиент" as Client <<actor>>
+object "Веб-интерфейс" as WebUI <<interface>>
+object "Менеджер" as Manager <<actor>>
+object "Desktop UI" as DeskUI <<interface>>
+object "AuthController" as AuthCtrl <<controller>>
+object "OrderController" as OrderCtrl <<controller>>
+object "ClientController" as ClientCtrl <<controller>>
+object "AssemblyController" as AssemblyCtrl <<controller>>
+object "Order" as Order <<entity>>
+object "ClientEntity" as ClientEnt <<entity>>
+object "AssemblyTask" as Assembly <<entity>>
+object "OrderRepository" as OrderRepo <<repository>>
+object "ClientRepository" as ClientRepo <<repository>>
+object "AssemblyRepository" as AssemblyRepo <<repository>>
+object "AuditService" as Audit <<service>>
+object "DbContext" as DB <<database>>
+
+' Связи между объектами
+Client --> WebUI : использует
+Manager --> DeskUI : использует
+WebUI --> AuthCtrl : вызывает
+WebUI --> OrderCtrl : вызывает
+DeskUI --> OrderCtrl : вызывает
+DeskUI --> AssemblyCtrl : вызывает
+OrderCtrl --> Order : управляет
+OrderCtrl --> OrderRepo : использует
+ClientCtrl --> ClientEnt : управляет
+ClientCtrl --> ClientRepo : использует
+AssemblyCtrl --> Assembly : управляет
+AssemblyCtrl --> AssemblyRepo : использует
+OrderRepo --> DB : запрашивает
+ClientRepo --> DB : запрашивает
+AssemblyRepo --> DB : запрашивает
+OrderCtrl --> Audit : логирует
+ClientCtrl --> Audit : логирует
+AssemblyCtrl --> Audit : логирует
+AuthCtrl --> Audit : логирует
+
+== 1: Регистрация/Авторизация клиента ==
+
+note over Client, AuthCtrl
+  Клиент регистрируется на сайте
+  или входит в личный кабинет
+end note
+
+Client -> WebUI : 1.1: Открыть сайт
+WebUI -> AuthCtrl : 1.2: CheckSession()
+AuthCtrl -> DB : 1.3: SELECT сессия
+DB --> AuthCtrl : 1.4: Session data
+
+alt Не авторизован
+    Client -> WebUI : 1.5: Ввести данные регистрации
+    WebUI -> AuthCtrl : 1.6: RegisterClient(clientData)
+    AuthCtrl --> ClientEnt : 1.7: new Client()
+    ClientEnt -> ClientEnt : 1.8: Validate()
+    AuthCtrl -> ClientRepo : 1.9: Add(client)
+    ClientRepo -> DB : 1.10: INSERT INTO клиенты
+    DB --> ClientRepo : 1.11: клиент_id
+    ClientRepo --> AuthCtrl : 1.12: Client with ID
+    AuthCtrl -> Audit : 1.13: LogInsert('клиенты', ...)
+    AuthCtrl --> WebUI : 1.14: Registration success
+    WebUI --> Client : 1.15: Личный кабинет
+else Авторизован
+    AuthCtrl --> WebUI : 1.16: User data
+    WebUI --> Client : 1.17: Личный кабинет
+end
+
+== 2: Создание заказа клиентом ==
+
+note over Client, Order
+  Клиент выбирает компоненты
+  и оформляет заказ
+end note
+
+Client -> WebUI : 2.1: Выбрать компоненты
+WebUI -> OrderCtrl : 2.2: GetAvailableComponents()
+OrderCtrl -> OrderRepo : 2.3: GetStockList()
+OrderRepo -> DB : 2.4: SELECT остатки_на_складе
+DB --> OrderRepo : 2.5: Components list
+OrderRepo --> OrderCtrl : 2.6: Available components
+OrderCtrl --> WebUI : 2.7: Catalog data
+WebUI --> Client : 2.8: Отобразить компоненты
+
+loop Добавление компонентов
+    Client -> WebUI : 2.9: Добавить компонент
+    WebUI -> OrderCtrl : 2.10: CheckAvailability(compId, qty)
+    OrderCtrl -> OrderRepo : 2.11: CheckStock(compId)
+    OrderRepo -> DB : 2.12: SELECT количество
+    DB --> OrderRepo : 2.13: Stock qty
+    OrderRepo --> OrderCtrl : 2.14: Available
+    OrderCtrl --> WebUI : 2.15: Confirmed
+    WebUI --> Client : 2.16: Компонент добавлен
+end
+
+Client -> WebUI : 2.17: Оформить заказ
+WebUI -> OrderCtrl : 2.18: CreateOrder(клиент_id, items)
+OrderCtrl --> Order : 2.19: new Order()
+Order -> Order : 2.20: Set status='новый'
+Order -> Order : 2.21: CalculateTotal()
+OrderCtrl -> OrderRepo : 2.22: Add(order)
+OrderRepo -> DB : 2.23: INSERT INTO заказы
+DB --> OrderRepo : 2.24: заказ_id
+OrderRepo --> OrderCtrl : 2.25: Order with ID
+OrderCtrl -> Audit : 2.26: LogInsert('заказы', ...)
+OrderCtrl --> WebUI : 2.27: Order created
+WebUI --> Client : 2.28: Номер заказа
+
+== 3: Обработка заказа менеджером ==
+
+note over Manager, Order
+  Менеджер проверяет новый заказ
+  и передает в сборку
+end note
+
+Manager -> DeskUI : 3.1: Проверить новые заказы
+DeskUI -> OrderCtrl : 3.2: GetNewOrders()
+OrderCtrl -> OrderRepo : 3.3: GetByStatus('новый')
+OrderRepo -> DB : 3.4: SELECT заказы
+DB --> OrderRepo : 3.5: Orders list
+OrderRepo --> OrderCtrl : 3.6: New orders
+OrderCtrl --> DeskUI : 3.7: Orders data
+DeskUI --> Manager : 3.8: Отобразить заказы
+
+Manager -> DeskUI : 3.9: Проверить комплектацию
+DeskUI -> OrderCtrl : 3.10: ValidateOrder(orderId)
+OrderCtrl -> OrderRepo : 3.11: CheckAllComponents(orderId)
+OrderRepo -> DB : 3.12: CHECK остатки
+DB --> OrderRepo : 3.13: All available
+OrderRepo --> OrderCtrl : 3.14: Valid
+OrderCtrl --> DeskUI : 3.15: Готов к сборке
+DeskUI --> Manager : 3.16: Подтверждение
+
+Manager -> DeskUI : 3.17: Передать в сборку
+DeskUI -> OrderCtrl : 3.18: UpdateStatus(orderId, 'в_работе')
+OrderCtrl -> Order : 3.19: ChangeStatus('в_работе')
+OrderCtrl -> OrderRepo : 3.20: Update(order)
+OrderRepo -> DB : 3.21: UPDATE заказы SET статус
+DB --> OrderRepo : 3.22: OK
+OrderCtrl -> Audit : 3.23: LogUpdate('заказы', ...)
+OrderCtrl --> DeskUI : 3.24: Status updated
+DeskUI --> Manager : 3.25: Заказ передан в сборку
+
+@enduml

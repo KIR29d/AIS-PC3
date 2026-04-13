@@ -1,0 +1,148 @@
+@startuml Sequence_Assembly_Process
+title Последовательность: Процесс сборки ПК
+
+skinparam sequenceMessageAlign center
+skinparam lifelineStrategy solid
+skinparam maxmessagesize 120
+autonumber
+
+' Объявляем ВСЕХ участников в начале, чтобы избежать дублирования линий жизни
+actor "Сборщик" as Builder
+participant "Desktop UI" as DeskUI
+control "AssemblyController" as AssemblyCtrl
+entity "БД Сборка" as AssemblyDB
+entity "БД Компоненты" as ComponentsDB
+entity "БД Склад" as StockDB
+entity "БД Заказы" as OrdersDB
+entity "БД Аудит" as AuditDB
+
+== Этап 1: Начало работы ==
+Builder -> DeskUI : Войти в систему
+activate DeskUI
+DeskUI --> Builder : Авторизация успешна
+
+Builder -> DeskUI : Получить мои задания
+DeskUI -> AssemblyCtrl : GetMyTasks(сотрудник_id)
+activate AssemblyCtrl
+AssemblyCtrl -> AssemblyDB : SELECT WHERE сотрудник_id
+activate AssemblyDB
+AssemblyDB --> AssemblyCtrl : Список заданий
+deactivate AssemblyDB
+AssemblyCtrl --> DeskUI : Задания (статус='в_сборке')
+DeskUI --> Builder : Отобразить список
+deactivate AssemblyCtrl
+deactivate DeskUI
+
+newpage
+
+== Этап 2: Выбор и начало сборки ==
+Builder -> DeskUI : Выбрать задание
+activate DeskUI
+DeskUI -> AssemblyCtrl : GetDetails(сборка_id)
+activate AssemblyCtrl
+AssemblyCtrl -> AssemblyDB : SELECT сборочное_задание
+activate AssemblyDB
+AssemblyDB --> AssemblyCtrl : Данные задания
+AssemblyCtrl -> AssemblyDB : SELECT компоненты
+AssemblyDB --> AssemblyCtrl : Список компонентов
+deactivate AssemblyDB
+AssemblyCtrl --> DeskUI : Детали
+DeskUI --> Builder : Показать конфигурацию
+deactivate AssemblyCtrl
+
+alt Статус = 'ожидает'
+    Builder -> DeskUI : Начать сборку
+    DeskUI -> AssemblyCtrl : StartAssembly(сборка_id)
+    activate AssemblyCtrl
+    AssemblyCtrl -> AssemblyDB : UPDATE статус, дата_начала
+    activate AssemblyDB
+    AssemblyDB --> AssemblyCtrl : Успешно
+    AssemblyCtrl -> AuditDB : LOG UPDATE
+    activate AuditDB
+    AuditDB --> AssemblyCtrl : Записано
+    deactivate AuditDB
+    AssemblyCtrl --> DeskUI : Сборка начата
+    DeskUI --> Builder : Подтверждение
+    deactivate AssemblyCtrl
+    deactivate AssemblyDB
+else Статус = 'в_сборке'
+    DeskUI --> Builder : Уже в процессе
+end
+deactivate DeskUI
+
+newpage
+
+== Этап 3: Установка компонентов ==
+loop Для каждого компонента
+    Builder -> DeskUI : Сканировать компонент
+    activate DeskUI
+    DeskUI -> AssemblyCtrl : ScanComponent(штрихкод)
+    activate AssemblyCtrl
+    
+    AssemblyCtrl -> ComponentsDB : Найти по штрихкоду
+    activate ComponentsDB
+    ComponentsDB --> AssemblyCtrl : компонент_id
+    deactivate ComponentsDB
+    
+    AssemblyCtrl -> AssemblyDB : Проверить в спецификации
+    activate AssemblyDB
+    AssemblyDB --> AssemblyCtrl : Требуется/Нет
+    deactivate AssemblyDB
+    
+    alt Компонент требуется
+        AssemblyCtrl -> AssemblyDB : Отметить установленным
+        activate AssemblyDB
+        AssemblyDB --> AssemblyCtrl : Успешно
+        deactivate AssemblyDB
+        AssemblyCtrl -> AuditDB : LOG установка
+        activate AuditDB
+        AuditDB --> AssemblyCtrl : Записано
+        deactivate AuditDB
+        AssemblyCtrl --> DeskUI : Подтверждён
+        DeskUI --> Builder : ✓ Правильный
+    else Не требуется
+        AssemblyCtrl --> DeskUI : Ошибка
+        DeskUI --> Builder : ✗ Неправильный
+    end
+    
+    deactivate AssemblyCtrl
+    deactivate DeskUI
+end
+
+newpage
+
+== Этап 4: Завершение сборки ==
+Builder -> DeskUI : Завершить сборку
+activate DeskUI
+DeskUI -> AssemblyCtrl : CompleteAssembly(сборка_id)
+activate AssemblyCtrl
+
+AssemblyCtrl -> AssemblyDB : UPDATE статус='готово', дата_завершения
+activate AssemblyDB
+AssemblyDB --> AssemblyCtrl : Успешно
+
+AssemblyCtrl -> AssemblyDB : GET заказ_id
+AssemblyDB --> AssemblyCtrl : заказ_id
+
+alt заказ_id существует
+    AssemblyCtrl -> OrdersDB : UPDATE статус='собран'
+    activate OrdersDB
+    OrdersDB --> AssemblyCtrl : Успешно
+    AssemblyCtrl -> AuditDB : LOG UPDATE заказы
+    activate AuditDB
+    AuditDB --> AssemblyCtrl : Записано
+    deactivate AuditDB
+    deactivate OrdersDB
+end
+
+AssemblyCtrl -> AuditDB : LOG UPDATE сборочные_задания
+activate AuditDB
+AuditDB --> AssemblyCtrl : Записано
+deactivate AuditDB
+
+AssemblyCtrl --> DeskUI : Сборка завершена
+DeskUI --> Builder : Подтверждение + статистика
+deactivate AssemblyCtrl
+deactivate AssemblyDB
+deactivate DeskUI
+@enduml

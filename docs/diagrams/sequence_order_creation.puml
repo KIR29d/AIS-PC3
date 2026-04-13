@@ -1,0 +1,114 @@
+@startuml Sequence_Order_Creation
+title Последовательность: Создание заказа клиентом (веб) и обработка менеджером
+
+skinparam sequenceMessageAlign center
+skinparam lifelineStrategy solid
+skinparam maxmessagesize 120
+autonumber
+
+' Объявляем ВСЕХ участников в начале, чтобы избежать дублирования линий жизни
+actor "Клиент" as Client
+participant "Веб-интерфейс" as WebUI
+control "AuthController" as AuthCtrl
+entity "БД Клиенты" as ClientsDB
+control "OrderController" as OrderCtrl
+entity "БД Заказы" as OrdersDB
+entity "БД Склад" as StockDB
+entity "БД Аудит" as AuditDB
+actor "Менеджер" as Manager
+participant "Desktop UI" as DeskUI
+
+== Этап 1: Регистрация/Авторизация клиента ==
+Client -> WebUI : Открыть сайт
+activate WebUI
+WebUI -> AuthCtrl : Проверка сессии
+activate AuthCtrl
+
+alt Не авторизован
+    Client -> WebUI : Ввод данных регистрации
+    WebUI -> AuthCtrl : RegisterClient(data)
+    activate AuthCtrl
+    AuthCtrl -> ClientsDB : INSERT клиент
+    activate ClientsDB
+    ClientsDB --> AuthCtrl : клиент_id
+    AuthCtrl -> AuditDB : LOG INSERT
+    deactivate ClientsDB
+    AuthCtrl --> WebUI : Успешно
+    WebUI --> Client : Личный кабинет
+    deactivate AuthCtrl
+else Авторизован
+    AuthCtrl --> WebUI : Данные клиента
+    WebUI --> Client : Личный кабинет
+end
+deactivate AuthCtrl
+deactivate WebUI
+
+newpage
+
+== Этап 2: Создание заказа клиентом ==
+Client -> WebUI : Выбрать компоненты
+activate WebUI
+WebUI -> OrderCtrl : GetAvailableComponents()
+activate OrderCtrl
+OrderCtrl -> StockDB : SELECT остатки
+activate StockDB
+StockDB --> OrderCtrl : Список компонентов
+deactivate StockDB
+OrderCtrl --> WebUI : Каталог
+WebUI --> Client : Отобразить компоненты
+
+loop Добавление компонентов в конфигуратор
+    Client -> WebUI : Добавить компонент
+    WebUI -> OrderCtrl : CheckAvailability(компонент_id)
+    OrderCtrl -> StockDB : Проверить количество
+    StockDB --> OrderCtrl : Доступно
+    OrderCtrl --> WebUI : Подтверждение
+    WebUI --> Client : Компонент добавлен
+end
+
+Client -> WebUI : Оформить заказ
+WebUI -> OrderCtrl : CreateOrder(клиент_id, состав)
+OrderCtrl -> StockDB : Резервирование компонентов
+StockDB --> OrderCtrl : Успешно
+OrderCtrl -> OrdersDB : INSERT заказ (статус='новый')
+activate OrdersDB
+OrdersDB --> OrderCtrl : заказ_id
+OrderCtrl -> AuditDB : LOG INSERT
+OrderCtrl --> WebUI : Номер заказа
+WebUI --> Client : Заказ оформлен
+deactivate OrdersDB
+deactivate OrderCtrl
+deactivate WebUI
+
+newpage
+
+== Этап 3: Обработка заказа менеджером ==
+Manager -> DeskUI : Проверить новые заказы
+activate DeskUI
+DeskUI -> OrderCtrl : GetNewOrders()
+activate OrderCtrl
+OrderCtrl -> OrdersDB : SELECT статус='новый'
+activate OrdersDB
+OrdersDB --> OrderCtrl : Список заказов
+deactivate OrdersDB
+OrderCtrl --> DeskUI : Данные заказов
+DeskUI --> Manager : Отобразить заказы
+
+Manager -> DeskUI : Проверить комплектацию
+DeskUI -> OrderCtrl : ValidateOrder(заказ_id)
+OrderCtrl -> StockDB : Сверка наличия
+StockDB --> OrderCtrl : Всё в наличии
+OrderCtrl --> DeskUI : Готов к сборке
+DeskUI --> Manager : Подтверждение
+
+Manager -> DeskUI : Передать в сборку
+DeskUI -> OrderCtrl : UpdateStatus(заказ_id, 'в_работе')
+OrderCtrl -> OrdersDB : UPDATE статус
+OrdersDB --> OrderCtrl : Успешно
+OrderCtrl -> AuditDB : LOG UPDATE
+OrderCtrl --> DeskUI : Статус изменён
+DeskUI --> Manager : Заказ передан в сборку
+
+deactivate OrderCtrl
+deactivate DeskUI
+@enduml
