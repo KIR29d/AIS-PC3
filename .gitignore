@@ -1,26 +1,4 @@
-```plantuml
-@startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
-
-title Sequence Diagram - Order Creation
-
-' Actors
-Person(customer, "Customer", "User placing an order")
-System_Boundary(api_gateway, "API Gateway")
-System_Boundary(order_service, "Order Service")
-System_Boundary(inventory_service, "Inventory Service")
-System_Boundary(payment_service, "Payment Service")
-System_Boundary(notification_service, "Notification Service")
-
-' Interactions
-Rel(customer, api_gateway, "POST /orders", "Creates new order request")
-Rel(api_gateway, order_service, "Forward /orders", "Route order creation")
-Rel(order_service, inventory_service, "GET /inventory/check", "Verify item availability")
-Rel(inventory_service, order_service, "Availability response", "Confirm stock status")
-Rel(order_service, payment_service, "POST /payments", "Process payment")
-Rel(payment_service, order_service, "Payment confirmation", "Payment success/failure")
-Rel(order_service, notification_service, "Send notification", "Order confirmation")
-Rel(notification_service, customer, "Email/SMS", "Delivery updates")
-
-@enduml
+```
+# Diagram files (if they are generated)
+*.puml
 ```
