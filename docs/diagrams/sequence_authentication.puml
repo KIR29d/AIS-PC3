@@ -1,34 +1,34 @@
-@startuml
-' Диаграмма последовательности: Аутентификация и авторизация пользователя
-' АИС для магазина кастомных ПК
+@startuml Sequence_Authentication
+title Последовательность: Аутентификация и авторизация
 
-autonumber
 skinparam sequenceMessageAlign center
+skinparam lifelineStrategy solid
+autonumber
 
 actor "Пользователь" as User
-participant "Desktop UI" as UI
+participant "UI" as UI
 control "AuthController" as AuthCtrl
-entity "Пользователи" as UsersDB
-entity "Роли" as RolesDB
-entity "Аудит" as AuditDB
+entity "БД Пользователи" as UsersDB
+entity "БД Роли" as RolesDB
+entity "БД Аудит" as AuditDB
 boundary "Главное окно" as MainWindow
 boundary "Окно заказов" as OrdersWindow
 boundary "Окно сборки" as AssemblyWindow
 
-== Попытка входа в систему ==
+== Вход в систему ==
 
-User -> UI : Ввод логина и пароля
+User -> UI : Ввод логина/пароля
 activate UI
 UI -> AuthCtrl : Login(login, password)
 activate AuthCtrl
 
 AuthCtrl -> UsersDB : SELECT по логину
 activate UsersDB
-UsersDB --> AuthCtrl : Данные пользователя (хэш пароля, роль_id, активен)
+UsersDB --> AuthCtrl : Данные (хэш, роль_id, активен)
 deactivate UsersDB
 
 alt Пользователь не найден
-    AuthCtrl --> UI : Ошибка: пользователь не найден
+    AuthCtrl --> UI : Ошибка: не найден
     UI --> User : Сообщение об ошибке
 else Пользователь найден
     AuthCtrl -> AuthCtrl : VerifyPassword(password, hash)
@@ -37,10 +37,10 @@ else Пользователь найден
         AuthCtrl --> UI : Ошибка: неверный пароль
         UI --> User : Сообщение об ошибке
     else Пароль верный
-        AuthCtrl -> UsersDB : Проверка активен = 1
+        AuthCtrl -> UsersDB : Проверка активен=1
         
         alt Пользователь заблокирован
-            AuthCtrl --> UI : Ошибка: учетная запись заблокирована
+            AuthCtrl --> UI : Ошибка: заблокирован
             UI --> User : Обратитесь к администратору
         else Пользователь активен
             AuthCtrl -> RolesDB : SELECT роль по роль_id
@@ -51,7 +51,7 @@ else Пользователь найден
             AuthCtrl -> UsersDB : UPDATE дата_последнего_входа
             UsersDB --> AuthCtrl : Успешно
             
-            AuthCtrl -> AuditDB : LOG INSERT (таблица='пользователи', операция='LOGIN')
+            AuthCtrl -> AuditDB : LOG INSERT (LOGIN)
             activate AuditDB
             AuditDB --> AuthCtrl : Записано
             deactivate AuditDB
@@ -64,19 +64,19 @@ end
 deactivate AuthCtrl
 deactivate UI
 
-== Инициализация интерфейса по роли ==
+== Инициализация интерфейса ==
 
-UI -> UI : Определить роль пользователя
+UI -> UI : Определить роль
 activate UI
 
 alt Роль = 'Администратор'
     UI -> MainWindow : ShowAdminMenu()
-    MainWindow --> UI : Показать все пункты меню
+    MainWindow --> UI : Показать все меню
     UI --> User : Полный доступ
 else Роль = 'Менеджер'
     UI -> MainWindow : ShowManagerMenu()
     MainWindow --> UI : Скрыть управление пользователями
-    UI --> User : Доступ к заказам и клиентам
+    UI --> User : Доступ к заказам/клиентам
 else Роль = 'Сборщик'
     UI -> MainWindow : ShowBuilderMenu()
     MainWindow --> UI : Только сборочные задания
@@ -85,14 +85,14 @@ end
 
 deactivate UI
 
-== Доступ к защищенным ресурсам ==
+== Проверка прав доступа ==
 
 User -> UI : Открыть окно заказов
 activate UI
 UI -> AuthCtrl : CheckPermission('orders.view')
 activate AuthCtrl
 
-AuthCtrl -> UsersDB : GET роль_id пользователя
+AuthCtrl -> UsersDB : GET роль_id
 activate UsersDB
 UsersDB --> AuthCtrl : роль_id
 AuthCtrl -> RolesDB : GET права для роли
@@ -105,15 +105,15 @@ deactivate AuthCtrl
 
 alt Доступ разрешен
     UI -> OrdersWindow : Open()
-    OrdersWindow --> UI : Окно заказов открыто
+    OrdersWindow --> UI : Окно открыто
     UI --> User : Отобразить заказы
 else Доступ запрещен
-    UI --> User : Сообщение: нет прав доступа
+    UI --> User : Нет прав доступа
 end
 
 deactivate UI
 
-== Работа с данными и аудит ==
+== Создание заказа с аудитом ==
 
 User -> UI : Создать новый заказ
 activate UI
@@ -131,11 +131,11 @@ activate UsersDB
 UsersDB --> AuthCtrl : пользователь_id
 deactivate UsersDB
 
-AuthCtrl -> UsersDB : INSERT в таблицу 'заказы'
+AuthCtrl -> UsersDB : INSERT в 'заказы'
 activate UsersDB
 UsersDB --> AuthCtrl : заказ_id
 
-AuthCtrl -> AuditDB : LOG INSERT (таблица='заказы', детали={данные})
+AuthCtrl -> AuditDB : LOG INSERT (таблица='заказы')
 activate AuditDB
 AuditDB --> AuthCtrl : Записано
 deactivate AuditDB
@@ -153,7 +153,7 @@ activate UI
 UI -> AuthCtrl : Logout()
 activate AuthCtrl
 
-AuthCtrl -> AuditDB : LOG (операция='LOGOUT')
+AuthCtrl -> AuditDB : LOG (LOGOUT)
 activate AuditDB
 AuditDB --> AuthCtrl : Записано
 deactivate AuditDB
