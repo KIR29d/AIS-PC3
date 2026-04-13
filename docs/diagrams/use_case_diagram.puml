@@ -1,0 +1,144 @@
+@startuml
+' Диаграмма вариантов использования (Use Case Diagram)
+' АИС для магазина кастомных ПК
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Администратор" as Admin
+actor "Менеджер" as Manager
+actor "Сборщик" as Builder
+actor "Клиент" as Client
+actor "Веб-пользователь" as WebUser
+
+rectangle "АИС CustomPC Manager" {
+  
+  ' Подсистема управления пользователями
+  usecase "Управление пользователями" as UC1
+  usecase "Аутентификация" as UC2
+  usecase "Управление ролями" as UC3
+  usecase "Просмотр журнала входов" as UC4
+  
+  ' Подсистема управления клиентами
+  usecase "Регистрация клиента" as UC5
+  usecase "Редактирование данных клиента" as UC6
+  usecase "Просмотр истории заказов" as UC7
+  
+  ' Подсистема управления сотрудниками
+  usecase "Добавление сотрудника" as UC8
+  usecase "Назначение должности" as UC9
+  usecase "Управление отделами" as UC10
+  
+  ' Подсистема управления заказами
+  usecase "Создание заказа" as UC11
+  usecase "Изменение статуса заказа" as UC12
+  usecase "Расчет суммы заказа" as UC13
+  usecase "Отгрузка заказа" as UC14
+  
+  ' Подсистема управления сборкой
+  usecase "Создание сборочного задания" as UC15
+  usecase "Назначение исполнителя" as UC16
+  usecase "Начало сборки" as UC17
+  usecase "Завершение сборки" as UC18
+  usecase "Добавление компонентов" as UC19
+  
+  ' Подсистема складского учета
+  usecase "Учет компонентов" as UC20
+  usecase "Просмотр остатков" as UC21
+  usecase "Обновление остатков" as UC22
+  usecase "Управление складами" as UC23
+  
+  ' Подсистема аудита
+  usecase "Просмотр аудита" as UC24
+  usecase "Формирование отчетов" as UC25
+  
+  ' Веб-подсистема для клиентов
+  usecase "Просмотр статуса заказа" as UC26
+  usecase "Конфигурация ПК" as UC27
+  usecase "Личный кабинет" as UC28
+}
+
+' Отношения акторов к вариантам использования
+
+Admin --> UC1
+Admin --> UC3
+Admin --> UC4
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC23
+Admin --> UC24
+Admin --> UC25
+
+Manager --> UC2
+Manager --> UC5
+Manager --> UC6
+Manager --> UC7
+Manager --> UC11
+Manager --> UC12
+Manager --> UC13
+Manager --> UC14
+Manager --> UC15
+Manager --> UC16
+Manager --> UC21
+Manager --> UC26
+
+Builder --> UC2
+Builder --> UC17
+Builder --> UC18
+Builder --> UC19
+Builder --> UC20
+Builder --> UC21
+Builder --> UC22
+
+Client --> UC2
+Client --> UC5
+Client --> UC6
+Client --> UC7
+Client --> UC11
+Client --> UC26
+Client --> UC27
+Client --> UC28
+
+WebUser --> UC26
+WebUser --> UC27
+WebUser --> UC28
+
+' Отношения между вариантами использования
+
+UC1 ..> UC2 : <<include>>
+UC5 ..> UC2 : <<include>>
+UC11 ..> UC13 : <<include>>
+UC15 ..> UC16 : <<extend>>
+UC17 ..> UC19 : <<include>>
+UC18 ..> UC12 : <<extend>>
+UC20 ..> UC22 : <<include>>
+UC24 ..> UC25 : <<extend>>
+
+note right of Admin
+  Полный доступ ко всем функциям системы
+  Управление правами пользователей
+end note
+
+note right of Manager
+  Работа с клиентами и заказами
+  Контроль процесса сборки
+end note
+
+note right of Builder
+  Выполнение сборочных заданий
+  Учет используемых компонентов
+end note
+
+note right of Client
+  Оформление заказов
+  Просмотр статусов
+  Личный кабинет
+end note
+
+note right of WebUser
+  Гостевой доступ к веб-интерфейсу
+  Просмотр информации без авторизации
+end note
+
+@enduml

@@ -1,0 +1,146 @@
+@startuml
+' ER-диаграмма для АИС магазина кастомных ПК
+' Согласно предоставленной структуре базы данных
+
+entity "роли" {
+    *роль_id : int <<PK>>
+    --
+    название_роли : varchar(50) <<UNIQUE, NOT NULL>>
+}
+
+entity "пользователи" {
+    *пользователь_id : int <<PK>>
+    --
+    логин : varchar(100) <<UNIQUE, NOT NULL>>
+    пароль : varchar(255) <<NOT NULL>>
+    роль_id : int <<FK, NOT NULL>>
+    сотрудник_id : int <<FK, NULL>>
+    клиент_id : int <<FK, NULL>>
+    активен : bit <<DEFAULT 1>>
+    дата_создания : datetime <<DEFAULT GETDATE()>>
+    дата_последнего_входа : datetime <<NULL>>
+}
+
+entity "клиенты" {
+    *клиент_id : int <<PK>>
+    --
+    тип_клиента : varchar(20) <<CHECK>>
+    фамилия : varchar(100) <<NULL>>
+    имя : varchar(100) <<NULL>>
+    отчество : varchar(100) <<NULL>>
+    наименование_организации : varchar(255) <<NULL>>
+    email : varchar(255) <<NOT NULL>>
+    номер_телефона : varchar(20) <<NOT NULL>>
+    дата_регистрации : datetime <<DEFAULT GETDATE()>>
+}
+
+entity "сотрудники" {
+    *сотрудник_id : int <<PK>>
+    --
+    фамилия : varchar(100) <<NOT NULL>>
+    имя : varchar(100) <<NOT NULL>>
+    отчество : varchar(100) <<NULL>>
+    должность : varchar(100) <<NOT NULL>>
+    дата_приёма : date <<NOT NULL>>
+    отдел_id : int <<FK, NOT NULL>>
+}
+
+entity "отделы" {
+    *отдел_id : int <<PK>>
+    --
+    название : varchar(100) <<NOT NULL>>
+}
+
+entity "заказы" {
+    *заказ_id : int <<PK>>
+    --
+    клиент_id : int <<FK, NOT NULL>>
+    статус : varchar(50) <<CHECK>>
+    общая_сумма : decimal(12,2) <<NOT NULL>>
+    дата_создания : datetime <<DEFAULT GETDATE()>>
+    дата_отгрузки : datetime <<NULL>>
+}
+
+entity "сборочные_задания" {
+    *сборка_id : int <<PK>>
+    --
+    название_конфигурации : varchar(255) <<NOT NULL>>
+    статус : varchar(50) <<CHECK>>
+    сотрудник_id : int <<FK, NULL>>
+    заказ_id : int <<FK, NULL>>
+    дата_начала : datetime <<NULL>>
+    дата_завершения : datetime <<NULL>>
+}
+
+entity "компоненты" {
+    *компонент_id : int <<PK>>
+    --
+    наименование : varchar(255) <<NOT NULL>>
+    тип : varchar(50) <<NOT NULL>>
+    производитель : varchar(100) <<NOT NULL>>
+}
+
+entity "компоненты_в_сборке" {
+    *сборка_id : int <<PK, FK>>
+    *компонент_id : int <<PK, FK>>
+    --
+    количество : int <<NOT NULL>>
+}
+
+entity "склады" {
+    *склад_id : int <<PK>>
+    --
+    название : varchar(100) <<NOT NULL>>
+    адрес : nvarchar(max) <<NOT NULL>>
+}
+
+entity "остатки_на_складе" {
+    *компонент_id : int <<PK, FK>>
+    *склад_id : int <<PK, FK>>
+    --
+    количество : int <<CHECK >= 0>>
+    дата_обновления : datetime <<DEFAULT GETDATE()>>
+}
+
+entity "аудит_изменений" {
+    *аудит_id : int <<PK>>
+    --
+    таблица : varchar(100) <<NOT NULL>>
+    операция : varchar(10) <<CHECK>>
+    пользователь_id : int <<FK, NOT NULL>>
+    дата_изменения : datetime <<DEFAULT GETDATE()>>
+    детали : nvarchar(max) <<NOT NULL>>
+}
+
+' Отношения между таблицами
+
+роли ||--o{ пользователи : "имеет"
+отделы ||--o{ сотрудники : "включает"
+сотрудники ||--o| пользователи : "связан с"
+клиенты ||--o{ заказы : "оформляет"
+клиенты ||--o| пользователи : "связан с"
+заказы ||--o{ сборочные_задания : "содержит"
+сотрудники ||--o{ сборочные_задания : "выполняет"
+сборочные_задания }|--|| компоненты_в_сборке : "включает"
+компоненты }|--|| компоненты_в_сборке : "входит в"
+компоненты }|--|| остатки_на_складе : "хранится на"
+склады ||--o{ остатки_на_складе : "содержит"
+пользователи ||--o{ аудит_изменений : "генерирует"
+
+note top of клиенты
+  тип_клиента IN ('физическое', 'юридическое')
+end note
+
+note top of заказы
+  статус IN ('новый', 'в_работе', 'собран', 'отгружен', 'выполнен')
+end note
+
+note top of сборочные_задания
+  статус IN ('ожидает', 'в_сборке', 'готово')
+end note
+
+note top of аудит_изменений
+  операция IN ('INSERT', 'UPDATE', 'DELETE')
+end note
+
+@enduml

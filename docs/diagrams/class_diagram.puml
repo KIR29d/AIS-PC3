@@ -1,0 +1,253 @@
+@startuml
+' Диаграмма классов (Class Diagram)
+' АИС для магазина кастомных ПК
+
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "Segoe UI"
+
+' Классы моделей данных
+
+class Role {
+    +int роль_id <<PK>>
+    +string название_роли
+    --
+    +Role()
+    +Validate() : bool
+}
+
+class User {
+    +int пользователь_id <<PK>>
+    +string логин
+    +string пароль
+    +int роль_id <<FK>>
+    +int? сотрудник_id <<FK>>
+    +int? клиент_id <<FK>>
+    +bool активен
+    +DateTime дата_создания
+    +DateTime? дата_последнего_входа
+    --
+    +User()
+    +Authenticate(password: string) : bool
+    +UpdateLastLogin()
+    +IsActive() : bool
+}
+
+class Client {
+    +int клиент_id <<PK>>
+    +string тип_клиента
+    +string? фамилия
+    +string? имя
+    +string? отчество
+    +string? наименование_организации
+    +string email
+    +string номер_телефона
+    +DateTime дата_регистрации
+    --
+    +Client()
+    +IsIndividual() : bool
+    +IsLegalEntity() : bool
+    +GetFullName() : string
+    +ValidateEmail() : bool
+    +ValidatePhone() : bool
+}
+
+class Employee {
+    +int сотрудник_id <<PK>>
+    +string фамилия
+    +string имя
+    +string? отчество
+    +string должность
+    +Date дата_приёма
+    +int отдел_id <<FK>>
+    --
+    +Employee()
+    +GetFullName() : string
+    +GetDepartment() : Department
+    +YearsEmployed() : int
+}
+
+class Department {
+    +int отдел_id <<PK>>
+    +string название
+    --
+    +Department()
+    +GetEmployees() : List<Employee>
+}
+
+class Order {
+    +int заказ_id <<PK>>
+    +int клиент_id <<FK>>
+    +string статус
+    +decimal общая_сумма
+    +DateTime дата_создания
+    +DateTime? дата_отгрузки
+    --
+    +Order()
+    +CalculateTotal() : decimal
+    +ChangeStatus(newStatus: string)
+    +CanShip() : bool
+    +Ship()
+}
+
+class AssemblyTask {
+    +int сборка_id <<PK>>
+    +string название_конфигурации
+    +string статус
+    +int? сотрудник_id <<FK>>
+    +int? заказ_id <<FK>>
+    +DateTime? дата_начала
+    +DateTime? дата_завершения
+    --
+    +AssemblyTask()
+    +StartAssembly(employeeId: int)
+    +CompleteAssembly()
+    +AddComponent(componentId: int, quantity: int)
+    +GetComponents() : List<AssemblyComponent>
+}
+
+class Component {
+    +int компонент_id <<PK>>
+    +string наименование
+    +string тип
+    +string производитель
+    --
+    +Component()
+    +GetStockQuantity(warehouseId: int) : int
+    +GetTotalStock() : int
+}
+
+class AssemblyComponent {
+    +int сборка_id <<PK, FK>>
+    +int компонент_id <<PK, FK>>
+    +int количество
+    --
+    +AssemblyComponent()
+    +ValidateQuantity() : bool
+}
+
+class Warehouse {
+    +int склад_id <<PK>>
+    +string название
+    +string адрес
+    --
+    +Warehouse()
+    +GetComponentQuantity(componentId: int) : int
+    +UpdateAddress(newAddress: string)
+}
+
+class StockBalance {
+    +int компонент_id <<PK, FK>>
+    +int склад_id <<PK, FK>>
+    +int количество
+    +DateTime дата_обновления
+    --
+    +StockBalance()
+    +UpdateQuantity(newQuantity: int)
+    +AddQuantity(amount: int)
+    +RemoveQuantity(amount: int) : bool
+}
+
+class AuditLog {
+    +int аудит_id <<PK>>
+    +string таблица
+    +string операция
+    +int пользователь_id <<FK>>
+    +DateTime дата_изменения
+    +string детали
+    --
+    +AuditLog()
+    +LogInsert(tableName: string, userId: int, details: string)
+    +LogUpdate(tableName: string, userId: int, details: string)
+    +LogDelete(tableName: string, userId: int, details: string)
+}
+
+' Отношения между классами
+
+Role "1" -- "*" User : "имеет >"
+User "0..1" -- "0..1" Employee : "связан с >"
+User "0..1" -- "0..1" Client : "связан с >"
+Department "1" -- "*" Employee : "включает >"
+Client "1" -- "*" Order : "оформляет >"
+Order "1" -- "*" AssemblyTask : "содержит >"
+Employee "1" -- "*" AssemblyTask : "выполняет >"
+AssemblyTask "*" -- "*" Component : "использует через >"
+AssemblyTask "1" -- "*" AssemblyComponent : "содержит >"
+Component "1" -- "*" AssemblyComponent : "входит в >"
+Component "1" -- "*" StockBalance : "хранится в >"
+Warehouse "1" -- "*" StockBalance : "содержит >"
+User "1" -- "*" AuditLog : "генерирует >"
+
+note top of Order
+  Статусы: новый, в_работе, собран, отгружен, выполнен
+end note
+
+note top of AssemblyTask
+  Статусы: ожидает, в_сборке, готово
+end note
+
+note top of Client
+  Тип клиента: физическое, юридическое
+end note
+
+note bottom of AuditLog
+  Операции: INSERT, UPDATE, DELETE
+  Все изменения логируются
+end note
+
+' Интерфейсы сервисов
+
+interface IUserService {
+    +Register(login: string, password: string, roleId: int) : User
+    +Authenticate(login: string, password: string) : User
+    +GetById(id: int) : User
+    +UpdateLastLogin(userId: int)
+}
+
+interface IOrderService {
+    +CreateOrder(clientId: int) : Order
+    +GetOrderById(id: int) : Order
+    +UpdateStatus(orderId: int, status: string)
+    +CalculateTotal(orderId: int) : decimal
+}
+
+interface IAssemblyService {
+    +CreateAssemblyTask(name: string, orderId: int?) : AssemblyTask
+    +AssignEmployee(assemblyId: int, employeeId: int)
+    +StartAssembly(assemblyId: int)
+    +CompleteAssembly(assemblyId: int)
+    +AddComponent(assemblyId: int, componentId: int, quantity: int)
+}
+
+interface IStockService {
+    +GetStock(componentId: int, warehouseId: int) : int
+    +UpdateStock(componentId: int, warehouseId: int, quantity: int)
+    +ReserveComponents(assemblyId: int) : bool
+}
+
+' Реализация сервисов
+
+class UserService {
+    -IUserRepository _userRepository
+    +Register(login: string, password: string, roleId: int) : User
+    +Authenticate(login: string, password: string) : User
+}
+
+class OrderService {
+    -IOrderRepository _orderRepository
+    -IClientRepository _clientRepository
+    +CreateOrder(clientId: int) : Order
+    +UpdateStatus(orderId: int, status: string)
+}
+
+class AssemblyService {
+    -IAssemblyRepository _assemblyRepository
+    -IStockService _stockService
+    +CreateAssemblyTask(name: string, orderId: int?) : AssemblyTask
+    +AddComponent(assemblyId: int, componentId: int, quantity: int)
+}
+
+UserService ..|> IUserService
+OrderService ..|> IOrderService
+AssemblyService ..|> IAssemblyService
+
+@enduml

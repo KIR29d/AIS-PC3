@@ -1,0 +1,156 @@
+@startuml
+' Диаграмма коммуникации (Communication Diagram)
+' АИС для магазина кастомных ПК
+' Взаимодействие при создании заказа и сборочного задания
+
+skinparam sequenceMessageAlign center
+
+' Объекты системы
+object "Менеджер" as Manager <<actor>>
+object "frmOrders" as OrdersForm <<form>>
+object "OrderController" as OrderCtrl <<controller>>
+object "ClientController" as ClientCtrl <<controller>>
+object "AssemblyController" as AssemblyCtrl <<controller>>
+object "Order" as Order <<entity>>
+object "Client" as Client <<entity>>
+object "AssemblyTask" as Assembly <<entity>>
+object "OrderRepository" as OrderRepo <<repository>>
+object "ClientRepository" as ClientRepo <<repository>>
+object "AssemblyRepository" as AssemblyRepo <<repository>>
+object "AuditService" as Audit <<service>>
+object "DbContext" as DB <<database>>
+
+' Связи между объектами
+Manager --> OrdersForm : использует
+OrdersForm --> OrderCtrl : вызывает
+OrdersForm --> ClientCtrl : вызывает
+OrderCtrl --> Order : управляет
+OrderCtrl --> OrderRepo : использует
+ClientCtrl --> Client : управляет
+ClientCtrl --> ClientRepo : использует
+AssemblyCtrl --> Assembly : управляет
+AssemblyCtrl --> AssemblyRepo : использует
+OrderRepo --> DB : запрашивает
+ClientRepo --> DB : запрашивает
+AssemblyRepo --> DB : запрашивает
+OrderCtrl --> Audit : логирует
+ClientCtrl --> Audit : логирует
+AssemblyCtrl --> Audit : логирует
+
+== 1: Поиск или регистрация клиента ==
+
+note over Manager, ClientCtrl
+  Менеджер вводит данные клиента
+  Система ищет существующего или создает нового
+end note
+
+Manager -> OrdersForm : 1.1: Ввести телефон/email
+OrdersForm -> ClientCtrl : 1.2: FindClient(contactData)
+ClientCtrl -> ClientRepo : 1.3: GetByContact(contactData)
+ClientRepo -> DB : 1.4: SELECT FROM клиенты
+DB --> ClientRepo : 1.5: Client data / null
+
+alt Клиент найден
+    ClientRepo --> ClientCtrl : 1.6: Client object
+    ClientCtrl --> OrdersForm : 1.7: Display client info
+    OrdersForm --> Manager : 1.8: Show existing client
+else Клиент не найден
+    Manager -> OrdersForm : 1.9: Ввести данные нового
+    OrdersForm -> ClientCtrl : 1.10: CreateClient(clientData)
+    ClientCtrl --> Client : 1.11: new Client()
+    Client -> Client : 1.12: Validate()
+    ClientCtrl -> ClientRepo : 1.13: Add(client)
+    ClientRepo -> DB : 1.14: INSERT INTO клиенты
+    DB --> ClientRepo : 1.15: клиент_id
+    ClientRepo --> ClientCtrl : 1.16: Client with ID
+    ClientCtrl -> Audit : 1.17: LogInsert('клиенты', ...)
+    ClientCtrl --> OrdersForm : 1.18: Client created
+    OrdersForm --> Manager : 1.19: Confirmation
+end
+
+== 2: Создание заказа ==
+
+note over Manager, OrderRepo
+  Менеджер создает новый заказ
+  для выбранного клиента
+end note
+
+Manager -> OrdersForm : 2.1: Click "Создать заказ"
+OrdersForm -> OrderCtrl : 2.2: CreateOrder(клиент_id)
+OrderCtrl --> Order : 2.3: new Order()
+Order -> Order : 2.4: Set status='новый'
+Order -> Order : 2.5: Set дата_создания=now()
+OrderCtrl -> OrderRepo : 2.6: Add(order)
+OrderRepo -> DB : 2.7: INSERT INTO заказы
+DB --> OrderRepo : 2.8: заказ_id
+OrderRepo --> OrderCtrl : 2.9: Order with ID
+OrderCtrl -> Audit : 2.10: LogInsert('заказы', ...)
+OrderCtrl --> OrdersForm : 2.11: Order created
+OrdersForm --> Manager : 2.12: Show order number
+
+== 3: Добавление компонентов в заказ ==
+
+note over Manager, Order
+  Менеджер добавляет компоненты
+  в спецификацию заказа
+end note
+
+loop Для каждого компонента
+    Manager -> OrdersForm : 3.1: Select component
+    OrdersForm -> OrderCtrl : 3.2: AddComponent(orderId, compId, qty)
+    OrderCtrl -> Order : 3.3: AddLineItem(component, qty)
+    Order -> Order : 3.4: CalculateTotal()
+    OrderCtrl -> OrderRepo : 3.5: Update(order)
+    OrderRepo -> DB : 3.6: UPDATE заказы SET общая_сумма
+    DB --> OrderRepo : 3.7: OK
+    OrderRepo --> OrderCtrl : 3.8: Updated
+    OrderCtrl -> Audit : 3.9: LogUpdate('заказы', ...)
+    OrderCtrl --> OrdersForm : 3.10: Component added
+    OrdersForm --> Manager : 3.11: Show updated total
+end
+
+== 4: Создание сборочного задания ==
+
+note over Manager, Assembly
+  После подтверждения заказа
+  создается сборочное задание
+end note
+
+Manager -> OrdersForm : 4.1: Click "Передать в сборку"
+OrdersForm -> OrderCtrl : 4.2: UpdateStatus(orderId, 'в_работе')
+OrderCtrl -> Order : 4.3: ChangeStatus('в_работе')
+OrderCtrl -> OrderRepo : 4.4: Update(order)
+OrderRepo -> DB : 4.5: UPDATE заказы SET статус
+DB --> OrderRepo : 4.6: OK
+OrderCtrl -> Audit : 4.7: LogUpdate('заказы', ...)
+
+OrdersForm -> AssemblyCtrl : 4.8: CreateAssemblyTask(orderId)
+AssemblyCtrl --> Assembly : 4.9: new AssemblyTask()
+Assembly -> Assembly : 4.10: Set status='ожидает'
+Assembly -> Assembly : 4.11: Link to order
+AssemblyCtrl -> AssemblyRepo : 4.12: Add(assembly)
+AssemblyRepo -> DB : 4.13: INSERT INTO сборочные_задания
+DB --> AssemblyRepo : 4.14: сборка_id
+AssemblyRepo --> AssemblyCtrl : 4.15: Assembly with ID
+AssemblyCtrl -> Audit : 4.16: LogInsert('сборочные_задания', ...)
+AssemblyCtrl --> OrdersForm : 4.17: Assembly created
+OrdersForm --> Manager : 4.18: Show assembly number
+
+== 5: Назначение исполнителя ==
+
+note over Manager, Assembly
+  Менеджер назначает сборщика
+  на сборочное задание
+end note
+
+Manager -> OrdersForm : 5.1: Select employee
+OrdersForm -> AssemblyCtrl : 5.2: AssignEmployee(assemblyId, employeeId)
+AssemblyCtrl -> Assembly : 5.3: Set сотрудник_id
+AssemblyCtrl -> AssemblyRepo : 5.4: Update(assembly)
+AssemblyRepo -> DB : 5.5: UPDATE сборочные_задания
+DB --> AssemblyRepo : 5.6: OK
+AssemblyCtrl -> Audit : 5.7: LogUpdate('сборочные_задания', ...)
+AssemblyCtrl --> OrdersForm : 5.8: Employee assigned
+OrdersForm --> Manager : 5.9: Confirmation
+
+@enduml
