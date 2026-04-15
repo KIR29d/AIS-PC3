@@ -1,8 +1,8 @@
 @startuml Sequence_Assembly_Process
+!theme plain
 title Последовательность: Процесс сборки ПК
 
 skinparam sequenceMessageAlign center
-skinparam lifelineStrategy solid
 skinparam maxmessagesize 120
 autonumber
 
@@ -18,6 +18,7 @@ entity "БД Аудит" as AuditDB
 
 == Этап 1: Начало работы ==
 Builder -> DeskUI : Войти в систему
+activate Builder
 activate DeskUI
 DeskUI --> Builder : Авторизация успешна
 
@@ -29,11 +30,9 @@ activate AssemblyDB
 AssemblyDB --> AssemblyCtrl : Список заданий
 deactivate AssemblyDB
 AssemblyCtrl --> DeskUI : Задания (статус='в_сборке')
-DeskUI --> Builder : Отобразить список
 deactivate AssemblyCtrl
+DeskUI --> Builder : Отобразить список
 deactivate DeskUI
-
-newpage
 
 == Этап 2: Выбор и начало сборки ==
 Builder -> DeskUI : Выбрать задание
@@ -70,8 +69,6 @@ else Статус = 'в_сборке'
 end
 deactivate DeskUI
 
-newpage
-
 == Этап 3: Установка компонентов ==
 loop Для каждого компонента
     Builder -> DeskUI : Сканировать компонент
@@ -99,17 +96,18 @@ loop Для каждого компонента
         AuditDB --> AssemblyCtrl : Записано
         deactivate AuditDB
         AssemblyCtrl --> DeskUI : Подтверждён
-        DeskUI --> Builder : ✓ Правильный
-    else Не требуется
-        AssemblyCtrl --> DeskUI : Ошибка
-        DeskUI --> Builder : ✗ Неправильный
+        DeskUI --> Builder : ✓ Правильный компонент
+    else Компонент не требуется
+        AssemblyCtrl --> DeskUI : Ошибка: лишний компонент
+        DeskUI --> Builder : ✗ Неправильный компонент
+    else Компонент не найден
+        AssemblyCtrl --> DeskUI : Ошибка: неизвестный штрихкод
+        DeskUI --> Builder : ✗ Компонент не распознан
     end
     
     deactivate AssemblyCtrl
     deactivate DeskUI
 end
-
-newpage
 
 == Этап 4: Завершение сборки ==
 Builder -> DeskUI : Завершить сборку
@@ -145,4 +143,5 @@ DeskUI --> Builder : Подтверждение + статистика
 deactivate AssemblyCtrl
 deactivate AssemblyDB
 deactivate DeskUI
+deactivate Builder
 @enduml

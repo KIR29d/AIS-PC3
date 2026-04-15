@@ -1,8 +1,8 @@
 @startuml Sequence_Order_Creation
+!theme plain
 title Последовательность: Создание заказа клиентом (веб) и обработка менеджером
 
 skinparam sequenceMessageAlign center
-skinparam lifelineStrategy solid
 skinparam maxmessagesize 120
 autonumber
 
@@ -20,6 +20,7 @@ participant "Desktop UI" as DeskUI
 
 == Этап 1: Регистрация/Авторизация клиента ==
 Client -> WebUI : Открыть сайт
+activate Client
 activate WebUI
 WebUI -> AuthCtrl : Проверка сессии
 activate AuthCtrl
@@ -27,23 +28,22 @@ activate AuthCtrl
 alt Не авторизован
     Client -> WebUI : Ввод данных регистрации
     WebUI -> AuthCtrl : RegisterClient(data)
-    activate AuthCtrl
     AuthCtrl -> ClientsDB : INSERT клиент
     activate ClientsDB
     ClientsDB --> AuthCtrl : клиент_id
-    AuthCtrl -> AuditDB : LOG INSERT
     deactivate ClientsDB
+    AuthCtrl -> AuditDB : LOG INSERT
+    activate AuditDB
+    AuditDB --> AuthCtrl : Записано
+    deactivate AuditDB
     AuthCtrl --> WebUI : Успешно
     WebUI --> Client : Личный кабинет
-    deactivate AuthCtrl
 else Авторизован
     AuthCtrl --> WebUI : Данные клиента
     WebUI --> Client : Личный кабинет
 end
 deactivate AuthCtrl
 deactivate WebUI
-
-newpage
 
 == Этап 2: Создание заказа клиентом ==
 Client -> WebUI : Выбрать компоненты
@@ -69,21 +69,32 @@ end
 Client -> WebUI : Оформить заказ
 WebUI -> OrderCtrl : CreateOrder(клиент_id, состав)
 OrderCtrl -> StockDB : Резервирование компонентов
-StockDB --> OrderCtrl : Успешно
-OrderCtrl -> OrdersDB : INSERT заказ (статус='новый')
-activate OrdersDB
-OrdersDB --> OrderCtrl : заказ_id
-OrderCtrl -> AuditDB : LOG INSERT
-OrderCtrl --> WebUI : Номер заказа
-WebUI --> Client : Заказ оформлен
-deactivate OrdersDB
+activate StockDB
+alt Компоненты доступны
+    StockDB --> OrderCtrl : Успешно зарезервировано
+    deactivate StockDB
+    OrderCtrl -> OrdersDB : INSERT заказ (статус='новый')
+    activate OrdersDB
+    OrdersDB --> OrderCtrl : заказ_id
+    deactivate OrdersDB
+    OrderCtrl -> AuditDB : LOG INSERT
+    activate AuditDB
+    AuditDB --> OrderCtrl : Записано
+    deactivate AuditDB
+    OrderCtrl --> WebUI : Номер заказа
+    WebUI --> Client : Заказ оформлен
+else Недостаточно компонентов
+    StockDB --> OrderCtrl : Ошибка резервирования
+    deactivate StockDB
+    OrderCtrl --> WebUI : Недостаточно товара
+    WebUI --> Client : Ошибка оформления
+end
 deactivate OrderCtrl
 deactivate WebUI
 
-newpage
-
 == Этап 3: Обработка заказа менеджером ==
 Manager -> DeskUI : Проверить новые заказы
+activate Manager
 activate DeskUI
 DeskUI -> OrderCtrl : GetNewOrders()
 activate OrderCtrl
@@ -111,4 +122,6 @@ DeskUI --> Manager : Заказ передан в сборку
 
 deactivate OrderCtrl
 deactivate DeskUI
+deactivate Manager
+deactivate Client
 @enduml

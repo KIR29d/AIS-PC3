@@ -1,8 +1,8 @@
 @startuml Sequence_Authentication
+!theme plain
 title Последовательность: Аутентификация и авторизация
 
 skinparam sequenceMessageAlign center
-skinparam lifelineStrategy solid
 skinparam maxmessagesize 120
 autonumber
 
@@ -16,6 +16,7 @@ entity "БД Аудит" as AuditDB
 
 == Этап 1: Вход в систему ==
 User -> UI : Ввод логина/пароля
+activate User
 activate UI
 UI -> AuthCtrl : Login(login, password)
 activate AuthCtrl
@@ -26,17 +27,23 @@ UsersDB --> AuthCtrl : Данные (хэш, роль_id, активен)
 deactivate UsersDB
 
 alt Пользователь не найден
-    AuthCtrl --> UI : Ошибка: не найден
-    UI --> User : Сообщение об ошибке
+    AuthCtrl -> AuditDB : LOG неудачная попытка входа
+    activate AuditDB
+    AuditDB --> AuthCtrl : Записано
+    deactivate AuditDB
+    AuthCtrl --> UI : Ошибка: неверные данные
+    UI --> User : Неверный логин или пароль
 else Пользователь найден
     AuthCtrl -> AuthCtrl : VerifyPassword(password, hash)
     
     alt Неверный пароль
-        AuthCtrl --> UI : Ошибка: неверный пароль
-        UI --> User : Сообщение об ошибке
+        AuthCtrl -> AuditDB : LOG неудачная попытка входа
+        activate AuditDB
+        AuditDB --> AuthCtrl : Записано
+        deactivate AuditDB
+        AuthCtrl --> UI : Ошибка: неверные данные
+        UI --> User : Неверный логин или пароль
     else Пароль верный
-        AuthCtrl -> UsersDB : Проверка активен=1
-        
         alt Пользователь заблокирован
             AuthCtrl --> UI : Ошибка: заблокирован
             UI --> User : Обратитесь к администратору
@@ -47,22 +54,23 @@ else Пользователь найден
             deactivate RolesDB
             
             AuthCtrl -> UsersDB : UPDATE дата_последнего_входа
+            activate UsersDB
             UsersDB --> AuthCtrl : Успешно
+            deactivate UsersDB
             
-            AuthCtrl -> AuditDB : LOG INSERT (LOGIN)
+            AuthCtrl -> AuditDB : LOG успешный вход
             activate AuditDB
             AuditDB --> AuthCtrl : Записано
             deactivate AuditDB
             
             AuthCtrl --> UI : Успешный вход + токен + роль
+            UI --> User : Добро пожаловать!
         end
     end
 end
 
 deactivate AuthCtrl
 deactivate UI
-
-newpage
 
 == Этап 2: Инициализация интерфейса ==
 UI -> UI : Определить роль
@@ -77,8 +85,6 @@ else Роль = 'Сборщик'
 end
 
 deactivate UI
-
-newpage
 
 == Этап 3: Проверка прав доступа ==
 User -> UI : Открыть окно заказов
@@ -104,4 +110,5 @@ else Доступ запрещен
 end
 
 deactivate UI
+deactivate User
 @enduml

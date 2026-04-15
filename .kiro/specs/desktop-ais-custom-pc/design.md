@@ -1,193 +1,255 @@
-# Дизайн десктопного приложения АИС "Кастом ПК"
+# Проектирование десктопного приложения АИС "Кастом ПК"
 
 ## Обзор
 
-Десктопное приложение АИС "Кастом ПК" будет разработано на платформе .NET 8 с использованием WPF для создания современного пользовательского интерфейса. Приложение использует архитектурный паттерн MVVM (Model-View-ViewModel) для обеспечения разделения логики и представления. Подключение к базе данных MySQL осуществляется через Entity Framework Core с использованием NuGet пакета MySql.EntityFrameworkCore.
+Десктопное приложение АИС "Кастом ПК" представляет собой WPF-приложение на платформе .NET 8, предназначенное для автоматизации процессов управления продажами и сборкой кастомных ПК. Приложение использует трехуровневую архитектуру с четким разделением ответственности между слоями представления, бизнес-логики и доступа к данным.
 
 ## Архитектура
 
-### Архитектурные слои
+### Общая архитектура системы
 
-1. **Presentation Layer (WPF Views + ViewModels)**
-   - MainWindow - главное окно с навигацией
-   - LoginWindow - окно авторизации
-   - AdminModule - модуль администрирования
-   - ManagerModule - модуль менеджера
-   - AssemblerModule - модуль сборщика
-   - ClientModule - модуль клиента
+Система построена по принципу многослойной архитектуры:
 
-2. **Business Logic Layer (Services)**
-   - AuthenticationService - сервис аутентификации
-   - UserService - управление пользователями
-   - OrderService - управление заказами
-   - ComponentService - управление компонентами
-   - AssemblyService - управление сборочными заданиями
-   - AuditService - ведение журнала аудита
-
-3. **Data Access Layer (Repositories + DbContext)**
-   - CustomPcDbContext - контекст Entity Framework
-   - Repository pattern для каждой сущности
-   - Unit of Work pattern для транзакций
-
-4. **Domain Layer (Models)**
-   - Модели данных, соответствующие структуре БД
-   - Бизнес-логика валидации
+1. **Presentation Layer (Слой представления)** - WPF интерфейс пользователя
+2. **Business Logic Layer (Слой бизнес-логики)** - сервисы и бизнес-правила
+3. **Data Access Layer (Слой доступа к данным)** - репозитории и Entity Framework
+4. **Database Layer (Слой базы данных)** - MS SQL Server база данных
 
 ### Технологический стек
 
-- **.NET 8** - основная платформа
-- **WPF** - пользовательский интерфейс
-- **Entity Framework Core** - ORM для работы с БД
-- **MySql.EntityFrameworkCore** - провайдер MySQL
-- **BCrypt.Net-Next** - хеширование паролей
-- **Microsoft.Extensions.DependencyInjection** - контейнер зависимостей
-- **CommunityToolkit.Mvvm** - MVVM фреймворк
+- **Frontend**: WPF (.NET 8) с MVVM паттерном
+- **Backend**: C# .NET 8
+- **ORM**: Entity Framework Core
+- **Database**: MS SQL Server (совместимость с MySQL через адаптер)
+- **DI Container**: Microsoft.Extensions.DependencyInjection
+- **Authentication**: BCrypt для хеширования паролей
+- **Logging**: Microsoft.Extensions.Logging
 
 ## Компоненты и интерфейсы
 
-### Основные модели данных
+### Слой представления (Presentation Layer)
+
+#### Главные окна и представления
+
+1. **LoginWindow** - окно аутентификации
+   - Поля ввода логина и пароля
+   - Кнопка входа и восстановления пароля
+   - Валидация на стороне клиента
+
+2. **MainWindow** - главное окно приложения
+   - Меню навигации по модулям
+   - Панель статуса пользователя
+   - Область контента для загрузки представлений
+
+3. **ClientsView** - управление клиентами
+   - Список клиентов с поиском и фильтрацией
+   - Формы создания/редактирования клиентов
+   - Разделение на физических и юридических лиц
+
+4. **OrdersView** - управление заказами
+   - Список заказов с группировкой по статусам
+   - Конфигуратор ПК для создания заказов
+   - Калькулятор стоимости
+
+5. **AssemblyView** - сборочные задания
+   - Канбан-доска заданий по статусам
+   - Детальная информация о компонентах
+   - Таймер работы сборщика
+
+6. **StockView** - управление складом
+   - Остатки компонентов по складам
+   - Операции поступления/списания
+   - Индикаторы критических остатков
+
+7. **ReportsView** - отчеты и аналитика
+   - Фильтры по периодам и параметрам
+   - Экспорт в Excel/PDF
+   - Графики и диаграммы
+
+#### Контроллеры (Controllers)
+
+Каждое представление имеет соответствующий контроллер, который:
+- Обрабатывает пользовательский ввод
+- Взаимодействует с сервисами бизнес-логики
+- Управляет состоянием представления
+- Обеспечивает валидацию данных
+
+### Слой бизнес-логики (Business Logic Layer)
+
+#### Основные сервисы
+
+1. **IAuthService / AuthService**
+   ```csharp
+   public interface IAuthService
+   {
+       Task<User> AuthenticateAsync(string login, string password);
+       Task<bool> ValidateTokenAsync(string token);
+       Task LogoutAsync(int userId);
+       Task<bool> ChangePasswordAsync(int userId, string oldPassword, string newPassword);
+   }
+   ```
+
+2. **IOrderService / OrderService**
+   ```csharp
+   public interface IOrderService
+   {
+       Task<Order> CreateOrderAsync(int clientId, List<OrderComponent> components);
+       Task<Order> GetOrderByIdAsync(int orderId);
+       Task<bool> UpdateOrderStatusAsync(int orderId, OrderStatus newStatus);
+       Task<decimal> CalculateOrderTotalAsync(List<OrderComponent> components);
+       Task<List<Order>> GetOrdersByStatusAsync(OrderStatus status);
+   }
+   ```
+
+3. **IAssemblyService / AssemblyService**
+   ```csharp
+   public interface IAssemblyService
+   {
+       Task<AssemblyTask> CreateAssemblyTaskAsync(int orderId, string configurationName);
+       Task<bool> AssignEmployeeAsync(int assemblyId, int employeeId);
+       Task<bool> StartAssemblyAsync(int assemblyId);
+       Task<bool> CompleteAssemblyAsync(int assemblyId);
+       Task<List<AssemblyTask>> GetTasksByEmployeeAsync(int employeeId);
+   }
+   ```
+
+4. **IStockService / StockService**
+   ```csharp
+   public interface IStockService
+   {
+       Task<int> GetStockQuantityAsync(int componentId, int warehouseId);
+       Task<bool> UpdateStockAsync(int componentId, int warehouseId, int quantity, string operation);
+       Task<bool> ReserveComponentsAsync(int assemblyId);
+       Task<List<StockBalance>> GetLowStockItemsAsync(int threshold = 10);
+   }
+   ```
+
+#### Бизнес-правила
+
+- **Валидация переходов статусов заказов**: новый → в_работе → собран → отгружен → выполнен
+- **Проверка наличия компонентов** перед созданием заказа
+- **Автоматическое создание сборочного задания** при переводе заказа в статус "в_работе"
+- **Списание компонентов со склада** при завершении сборки
+- **Расчет стоимости заказа** на основе текущих цен компонентов
+
+### Слой доступа к данным (Data Access Layer)
+
+#### Entity Framework модели
 
 ```csharp
-// Основные entity классы
 public class User
 {
     public int UserId { get; set; }
     public string Login { get; set; }
-    public string Password { get; set; }
+    public string PasswordHash { get; set; }
     public int RoleId { get; set; }
+    public int? EmployeeId { get; set; }
+    public int? ClientId { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedDate { get; set; }
+    public DateTime? LastLoginDate { get; set; }
+    
     public Role Role { get; set; }
-    // ... другие свойства
+    public Employee Employee { get; set; }
+    public Client Client { get; set; }
 }
 
 public class Order
 {
     public int OrderId { get; set; }
     public int ClientId { get; set; }
-    public Client Client { get; set; }
-    public string Status { get; set; }
+    public OrderStatus Status { get; set; }
     public decimal TotalAmount { get; set; }
-    // ... другие свойства
-}
-
-public class Component
-{
-    public int ComponentId { get; set; }
-    public string Name { get; set; }
-    public string Type { get; set; }
-    public string Manufacturer { get; set; }
-    // ... другие свойства
+    public DateTime CreatedDate { get; set; }
+    public DateTime? ShippedDate { get; set; }
+    
+    public Client Client { get; set; }
+    public List<AssemblyTask> AssemblyTasks { get; set; }
 }
 ```
 
-### Интерфейсы сервисов
+#### Репозитории
+
+Каждая сущность имеет соответствующий репозиторий с базовыми CRUD операциями:
 
 ```csharp
-public interface IAuthenticationService
+public interface IRepository<T> where T : class
 {
-    Task<User> AuthenticateAsync(string login, string password);
-    Task<bool> ValidatePermissionAsync(int userId, string permission);
+    Task<T> GetByIdAsync(int id);
+    Task<List<T>> GetAllAsync();
+    Task<T> AddAsync(T entity);
+    Task<T> UpdateAsync(T entity);
+    Task<bool> DeleteAsync(int id);
 }
 
-public interface IOrderService
+public interface IOrderRepository : IRepository<Order>
 {
-    Task<IEnumerable<Order>> GetOrdersAsync();
-    Task<Order> CreateOrderAsync(Order order);
-    Task UpdateOrderStatusAsync(int orderId, string status);
-}
-
-public interface IComponentService
-{
-    Task<IEnumerable<Component>> GetComponentsAsync();
-    Task<IEnumerable<Component>> GetComponentsByTypeAsync(string type);
-    Task<bool> CheckCompatibilityAsync(IEnumerable<int> componentIds);
+    Task<List<Order>> GetOrdersByClientAsync(int clientId);
+    Task<List<Order>> GetOrdersByStatusAsync(OrderStatus status);
+    Task<List<Order>> GetOrdersByDateRangeAsync(DateTime from, DateTime to);
 }
 ```
-
-### Структура пользовательского интерфейса
-
-#### Цветовая схема (серые тона)
-- **Основной фон**: #F5F5F5 (светло-серый)
-- **Панели**: #E0E0E0 (средне-серый)
-- **Границы**: #BDBDBD (темно-серый)
-- **Текст**: #212121 (почти черный)
-- **Акценты**: #757575 (серый)
-- **Кнопки**: #9E9E9E (серый) / #616161 (темно-серый при наведении)
-
-#### Главное окно (MainWindow)
-- Верхняя панель с информацией о пользователе и кнопкой выхода
-- Боковая навигационная панель с модулями (в зависимости от роли)
-- Основная рабочая область для отображения выбранного модуля
-- Статусная строка внизу
-
-#### Модули интерфейса
-
-**1. Модуль авторизации**
-- Поля ввода логина и пароля
-- Кнопка "Войти"
-- Заглушка для логотипа компании
-
-**2. Административный модуль**
-- Управление пользователями (список, добавление, редактирование)
-- Управление ролями и правами
-- Справочники (отделы, склады, компоненты)
-- Просмотр журнала аудита
-
-**3. Модуль менеджера**
-- Список заказов с фильтрацией по статусам
-- Детальная информация о заказе
-- Создание и назначение сборочных заданий
-- Управление статусами заказов
-
-**4. Модуль сборщика**
-- Список назначенных заданий
-- Детали сборочного задания с компонентами
-- Кнопки "Начать сборку" / "Завершить сборку"
-- Заглушки для изображений компонентов
-
-**5. Модуль клиента**
-- Каталог компонентов по категориям
-- Конфигуратор ПК с проверкой совместимости
-- Корзина и оформление заказа
-- История заказов
 
 ## Модели данных
 
-### Entity Framework модели
+### Основные сущности
 
-Модели данных будут точно соответствовать структуре базы данных:
+1. **User (Пользователь)**
+   - Аутентификация и авторизация
+   - Связь с сотрудником или клиентом
+   - Роли и права доступа
 
-- **Роли** (роли) - справочник ролей пользователей
-- **Отделы** (отделы) - справочник отделов
-- **Склады** (склады) - справочник складов
-- **Компоненты** (компоненты) - каталог компонентов ПК
-- **Клиенты** (клиенты) - информация о клиентах
-- **Сотрудники** (сотрудники) - информация о сотрудниках
-- **Пользователи** (пользователи) - учетные записи системы
-- **Заказы** (заказы) - заказы клиентов
-- **СборочныеЗадания** (сборочные_задания) - задания на сборку
-- **КомпонентыВСборке** (компоненты_в_сборке) - состав сборок
-- **ОстаткиНаСкладе** (остатки_на_складе) - складские остатки
-- **АудитИзменений** (аудит_изменений) - журнал аудита
+2. **Client (Клиент)**
+   - Физические и юридические лица
+   - Контактная информация
+   - История заказов
 
-### Конфигурация Entity Framework
+3. **Order (Заказ)**
+   - Конфигурация ПК
+   - Статусы выполнения
+   - Стоимость и даты
+
+4. **AssemblyTask (Сборочное задание)**
+   - Назначение исполнителя
+   - Компоненты для сборки
+   - Временные метки
+
+5. **Component (Компонент)**
+   - Каталог компонентов ПК
+   - Типы и производители
+   - Складские остатки
+
+### Перечисления
 
 ```csharp
-public class CustomPcDbContext : DbContext
+public enum OrderStatus
 {
-    public DbSet<Role> Roles { get; set; }
-    public DbSet<User> Users { get; set; }
-    public DbSet<Client> Clients { get; set; }
-    public DbSet<Order> Orders { get; set; }
-    public DbSet<Component> Components { get; set; }
-    // ... другие DbSet
+    New = 1,
+    InProgress = 2,
+    Assembled = 3,
+    Shipped = 4,
+    Completed = 5
+}
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        // Конфигурация маппинга на русские названия таблиц
-        modelBuilder.Entity<Role>().ToTable("роли");
-        modelBuilder.Entity<User>().ToTable("пользователи");
-        // ... другие конфигурации
-    }
+public enum AssemblyStatus
+{
+    Waiting = 1,
+    InAssembly = 2,
+    Ready = 3
+}
+
+public enum ClientType
+{
+    Individual = 1,
+    LegalEntity = 2
+}
+
+public enum UserRole
+{
+    Administrator = 1,
+    Manager = 2,
+    Assembler = 3,
+    Client = 4
 }
 ```
 
@@ -195,94 +257,127 @@ public class CustomPcDbContext : DbContext
 
 ### Стратегия обработки ошибок
 
-1. **Уровень данных**: Обработка исключений подключения к БД
-2. **Уровень сервисов**: Валидация бизнес-правил и логирование
-3. **Уровень представления**: Отображение пользовательских сообщений
+1. **Валидация на уровне UI** - немедленная обратная связь пользователю
+2. **Бизнес-валидация в сервисах** - проверка бизнес-правил
+3. **Обработка исключений базы данных** - логирование и пользовательские сообщения
+4. **Глобальный обработчик исключений** - для непредвиденных ошибок
 
-### Типы ошибок
-
-- **DatabaseConnectionException** - ошибки подключения к БД
-- **ValidationException** - ошибки валидации данных
-- **AuthenticationException** - ошибки аутентификации
-- **AuthorizationException** - ошибки авторизации
-- **BusinessLogicException** - нарушения бизнес-правил
-
-### Механизм уведомлений
+### Типы исключений
 
 ```csharp
-public interface INotificationService
+public class BusinessLogicException : Exception
 {
-    void ShowError(string message);
-    void ShowWarning(string message);
-    void ShowInfo(string message);
-    void ShowSuccess(string message);
+    public string UserMessage { get; }
+    public BusinessLogicException(string userMessage, string technicalMessage) 
+        : base(technicalMessage)
+    {
+        UserMessage = userMessage;
+    }
+}
+
+public class ValidationException : Exception
+{
+    public Dictionary<string, string> ValidationErrors { get; }
+    public ValidationException(Dictionary<string, string> errors) 
+        : base("Validation failed")
+    {
+        ValidationErrors = errors;
+    }
 }
 ```
 
 ## Стратегия тестирования
 
-### Типы тестов
+### Уровни тестирования
 
-1. **Unit Tests**
-   - Тестирование сервисов бизнес-логики
-   - Тестирование валидации моделей
-   - Тестирование утилитарных классов
+1. **Unit Tests** - тестирование сервисов и бизнес-логики
+   - Использование Moq для мокирования зависимостей
+   - Покрытие всех бизнес-правил
+   - Тестирование валидации данных
 
-2. **Integration Tests**
-   - Тестирование работы с базой данных
-   - Тестирование взаимодействия между слоями
+2. **Integration Tests** - тестирование взаимодействия с базой данных
+   - In-Memory база данных для тестов
+   - Тестирование репозиториев
+   - Проверка миграций
 
-3. **UI Tests**
+3. **UI Tests** - автоматизированное тестирование интерфейса
+   - Использование WPF Test Framework
    - Тестирование основных пользовательских сценариев
-   - Тестирование навигации между модулями
+   - Проверка валидации форм
 
-### Инструменты тестирования
+### Тестовые данные
 
-- **xUnit** - фреймворк для unit-тестов
-- **Moq** - библиотека для создания mock-объектов
-- **FluentAssertions** - библиотека для читаемых assertions
-- **Microsoft.EntityFrameworkCore.InMemory** - in-memory БД для тестов
+Создание набора тестовых данных для:
+- Различных ролей пользователей
+- Клиентов разных типов
+- Заказов в различных статусах
+- Компонентов и складских остатков
 
-### Покрытие тестами
+## Дизайн пользовательского интерфейса
 
-- Критическая бизнес-логика: 90%+
-- Сервисы: 80%+
-- Репозитории: 70%+
-- ViewModels: 60%+
+### Цветовая схема (серые тона)
+
+```xml
+<ResourceDictionary>
+    <!-- Основные цвета -->
+    <SolidColorBrush x:Key="PrimaryGray" Color="#FF2D2D30"/>
+    <SolidColorBrush x:Key="SecondaryGray" Color="#FF3F3F46"/>
+    <SolidColorBrush x:Key="LightGray" Color="#FF68217A"/>
+    <SolidColorBrush x:Key="BackgroundGray" Color="#FFF0F0F0"/>
+    <SolidColorBrush x:Key="TextGray" Color="#FF1E1E1E"/>
+    
+    <!-- Акцентные цвета -->
+    <SolidColorBrush x:Key="AccentBlue" Color="#FF007ACC"/>
+    <SolidColorBrush x:Key="SuccessGreen" Color="#FF16C60C"/>
+    <SolidColorBrush x:Key="WarningOrange" Color="#FFFF8C00"/>
+    <SolidColorBrush x:Key="ErrorRed" Color="#FFE74C3C"/>
+</ResourceDictionary>
+```
+
+### Принципы дизайна
+
+1. **Минимализм** - чистый интерфейс без лишних элементов
+2. **Консистентность** - единообразие элементов управления
+3. **Доступность** - поддержка сенсорного ввода и клавиатуры
+4. **Отзывчивость** - индикаторы загрузки и обратная связь
+5. **Иерархия** - четкое разделение информации по важности
+
+### Компоненты интерфейса
+
+1. **Заглушки изображений** - серые прямоугольники с иконками
+2. **Индикаторы статусов** - цветовое кодирование
+3. **Формы ввода** - валидация в реальном времени
+4. **Таблицы данных** - сортировка и фильтрация
+5. **Диалоговые окна** - подтверждение операций
 
 ## Безопасность
 
 ### Аутентификация и авторизация
 
-1. **Хеширование паролей**: BCrypt с солью
-2. **Сессии**: Хранение информации о текущем пользователе в памяти
-3. **Права доступа**: Проверка прав на уровне сервисов и UI
+1. **Хеширование паролей** - BCrypt с солью
+2. **Сессии пользователей** - токены с ограниченным временем жизни
+3. **Разграничение доступа** - проверка ролей на уровне UI и сервисов
+4. **Аудит действий** - логирование всех операций изменения данных
 
 ### Защита данных
 
-1. **Параметризованные запросы**: Защита от SQL-инъекций
-2. **Валидация входных данных**: На всех уровнях приложения
-3. **Логирование**: Запись всех критических операций
-
-### Аудит
-
-Все операции INSERT, UPDATE, DELETE автоматически записываются в таблицу аудит_изменений с помощью:
-- Перехватчиков Entity Framework
-- Автоматического определения пользователя
-- Сериализации изменений в JSON
+1. **Валидация входных данных** - предотвращение SQL-инъекций
+2. **Шифрование соединения** - SSL/TLS для подключения к БД
+3. **Резервное копирование** - автоматические бэкапы базы данных
+4. **Логирование безопасности** - отслеживание попыток несанкционированного доступа
 
 ## Производительность
 
-### Оптимизация запросов
+### Оптимизация базы данных
 
-1. **Lazy Loading**: Отключено по умолчанию
-2. **Explicit Loading**: Загрузка связанных данных по требованию
-3. **Projection**: Выборка только необходимых полей
-4. **Caching**: Кеширование справочных данных
+1. **Индексы** - на часто используемые поля для поиска
+2. **Пагинация** - загрузка данных порциями
+3. **Кеширование** - часто запрашиваемые справочники
+4. **Ленивая загрузка** - связанные данные по требованию
 
-### Пользовательский интерфейс
+### Оптимизация интерфейса
 
-1. **Виртуализация**: Для больших списков данных
-2. **Асинхронные операции**: Все операции с БД асинхронные
-3. **Индикаторы загрузки**: Для длительных операций
-4. **Пагинация**: Для больших наборов данных
+1. **Виртуализация списков** - для больших объемов данных
+2. **Асинхронные операции** - предотвращение блокировки UI
+3. **Сжатие изображений** - оптимизация размера файлов
+4. **Кеширование представлений** - переиспользование созданных элементов
