@@ -1,0 +1,32 @@
+@startuml
+title Authentication Process
+
+actor User
+participant UI
+control AuthController
+database UsersDB
+
+User -> UI : Enter credentials
+activate User
+activate UI
+
+UI -> AuthController : Login(username, password)
+activate AuthController
+
+AuthController -> UsersDB : SELECT user
+activate UsersDB
+UsersDB --> AuthController : User data
+deactivate UsersDB
+
+alt User found
+    AuthController --> UI : Success + token
+    UI --> User : Welcome!
+else User not found
+    AuthController --> UI : Error
+    UI --> User : Invalid credentials
+end
+
+deactivate AuthController
+deactivate UI
+deactivate User
+@enduml
